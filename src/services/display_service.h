@@ -25,6 +25,7 @@ private:
   void ShowWord(const DisplayRequest& request);
   void ShowLine(const DisplayRequest& request);
   void ShowLines(const DisplayRequest& request);
+  void ShowSongList(const DisplayRequest& request);
   void ShowAppMenu(const DisplayRequest& request);
   void ShowBigTime(const DisplayRequest& request);
   void ShowScreensaver(const DisplayRequest& request);

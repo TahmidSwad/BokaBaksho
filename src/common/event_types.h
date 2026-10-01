@@ -57,6 +57,9 @@ struct DisplayRequest {
   bool blink = false;
   TextSize text_size = TextSize::Medium;
   TextAlign alignment = TextAlign::Center;
+  uint8_t total_count = 0;
+  bool has_more_above = false;
+  bool has_more_below = false;
   // ShowScreensaver: cat animation state.
   uint8_t cat_state = 0;
   uint8_t cat_base_state = 0;

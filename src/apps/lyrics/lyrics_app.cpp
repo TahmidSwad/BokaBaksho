@@ -1,7 +1,6 @@
 #include "apps/lyrics/lyrics_app.h"
 
 #include "core/system.h"
-#include "services/storage_service.h"
 #include "services/ble_service.h"
 #include "common/event_types.h"
 #include "common/config.h"
@@ -14,12 +13,16 @@ LyricsApp lyrics_app;
 
 bool LyricsApp::Begin() {
   ClearData();
-  ScanLyricFiles();
+  EnterWaitingSongs();
   return true;
 }
 
 bool LyricsApp::OnActivate() {
-  EnterFileList();
+  if (total_songs_ == 0) {
+    EnterWaitingSongs();
+  } else {
+    EnterFileList();
+  }
   Serial.println("LYRICS_ON");
   return true;
 }
@@ -31,7 +34,7 @@ void LyricsApp::OnDeactivate() {
 }
 
 // ==========================================================
-// BLE HANDLER
+// BLE HANDLERS
 // ==========================================================
 
 void LyricsApp::OnAudioStarted() {
@@ -41,12 +44,86 @@ void LyricsApp::OnAudioStarted() {
   }
 }
 
+void LyricsApp::OnPlaybackEnded() {
+  if (state_ == State::Playing) {
+    Serial.println("BLE: END received");
+    playback_ended_ = true;
+  }
+}
+
+void LyricsApp::OnTotalSongs(uint8_t total) {
+  total_songs_ = total;
+  Serial.print("BLE: TOTAL_SONGS=");
+  Serial.println(total);
+}
+
+void LyricsApp::OnSongListReceived(const char* names) {
+  if (names == nullptr) return;
+  const char* p = names;
+  uint8_t added = 0;
+  while (*p && added < kWindowSize) {
+    const char* start = p;
+    while (*p && *p != '|') p++;
+    size_t len = p - start;
+    if (len >= kSongNameLen) len = kSongNameLen - 1;
+    if (len > 0) {
+      memcpy(song_buffer_[added], start, len);
+      song_buffer_[added][len] = '\0';
+      ++added;
+    }
+    if (*p == '|') p++;
+  }
+  buffer_count_ = added;
+  waiting_for_songs_ = false;
+
+  if (added < kWindowSize) {
+    uint8_t actual_total = buffer_offset_ + added;
+    if (total_songs_ == 0 || actual_total < total_songs_) {
+      total_songs_ = actual_total;
+    }
+  }
+
+  Serial.print("BLE: SONGS received ");
+  Serial.print(added);
+  Serial.println(" songs");
+
+  if (state_ == State::WaitingSongs && added > 0) {
+    EnterFileList();
+  } else if (state_ == State::FileList) {
+    ShowFileList();
+  }
+}
+
+void LyricsApp::OnLyricsData(const char* line) {
+  if (state_ != State::Loading || line == nullptr) return;
+  ParseLine(line);
+}
+
+void LyricsApp::OnLyricsEnd() {
+  if (state_ == State::Loading && waiting_for_lyrics_) {
+    Serial.print("BLE: LYRICS_END, ");
+    Serial.print(word_count_);
+    Serial.println(" words parsed");
+    if (word_count_ > 0) {
+      lyrics_received_ = true;
+    } else {
+      Serial.println("BLE: No lyrics received");
+      ShowStatus("No lyrics", TextSize::Medium);
+      state_ = State::LoadFailed;
+      load_failed_start_ = millis();
+    }
+  }
+}
+
 // ==========================================================
 // INPUT HANDLING
 // ==========================================================
 
 bool LyricsApp::HandleInput(const InputEvent& event) {
   switch (state_) {
+    case State::WaitingSongs:
+      if (event.type == InputType::Back) return false;
+      return true;
     case State::FileList:
       return HandleFileListInput(event);
     case State::Loading:
@@ -57,7 +134,10 @@ bool LyricsApp::HandleInput(const InputEvent& event) {
       }
       return false;
     case State::LoadFailed:
-      ReturnToFileList();
+      if (event.type == InputType::Back) {
+        ReturnToFileList();
+        return true;
+      }
       return true;
     case State::Playing:
     case State::Paused:
@@ -68,30 +148,34 @@ bool LyricsApp::HandleInput(const InputEvent& event) {
 }
 
 bool LyricsApp::HandleFileListInput(const InputEvent& event) {
-  if (lyric_file_count_ == 0) {
+  if (buffer_count_ == 0) {
     if (event.type == InputType::Back) return false;
     return true;
   }
   switch (event.type) {
     case InputType::ButtonDecrement:
     case InputType::RotateLeft:
-      if (selected_file_index_ > 0) {
-        --selected_file_index_;
-        if (selected_file_index_ < list_scroll_) {
-          --list_scroll_;
-        }
+      if (selected_index_ > 0) {
+        --selected_index_;
+      } else {
+        selected_index_ = total_songs_ - 1;
+      }
+      if (selected_index_ < buffer_offset_ ||
+          selected_index_ >= buffer_offset_ + buffer_count_) {
+        RequestSongs(selected_index_ < kWindowSize / 2 ? 0 : selected_index_ - kWindowSize / 2);
       }
       ShowFileList();
       return true;
     case InputType::ButtonIncrement:
     case InputType::RotateRight:
-      if (selected_file_index_ < lyric_file_count_ - 1) {
-        ++selected_file_index_;
-        if (selected_file_index_ >= list_scroll_ + kVisibleLines) {
-          if (list_scroll_ + kVisibleLines < lyric_file_count_) {
-            ++list_scroll_;
-          }
-        }
+      if (selected_index_ < total_songs_ - 1) {
+        ++selected_index_;
+      } else {
+        selected_index_ = 0;
+      }
+      if (selected_index_ < buffer_offset_ ||
+          selected_index_ >= buffer_offset_ + buffer_count_) {
+        RequestSongs(selected_index_ < kWindowSize / 2 ? 0 : selected_index_ - kWindowSize / 2);
       }
       ShowFileList();
       return true;
@@ -118,111 +202,68 @@ bool LyricsApp::HandlePlaybackInput(const InputEvent& event) {
 }
 
 // ==========================================================
-// FILE LISTING
+// BLE REQUESTS
 // ==========================================================
 
-void LyricsApp::ScanLyricFiles() {
-  lyric_file_count_ = 0;
-  if (!storage_service.IsReady()) return;
-  const char* dir_path = "/lyrics";
-  File dir = storage_service.Open(dir_path, FILE_READ);
-  if (!dir || !dir.isDirectory()) {
-    Serial.println("LYRICS: /lyrics dir not found");
-    return;
+void LyricsApp::RequestSongs(uint8_t offset) {
+  char cmd[32];
+  snprintf(cmd, sizeof(cmd), "REQUEST_SONGS|%d|5", offset);
+  if (ble_service.IsConnected()) {
+    ble_service.SendCommand(cmd);
+    Serial.print("BLE TX: ");
+    Serial.println(cmd);
+    waiting_for_songs_ = true;
+    song_request_start_ = millis();
+  } else {
+    Serial.println("BLE: not connected");
   }
-  while (true) {
-    File entry = dir.openNextFile();
-    if (!entry) break;
-    if (!entry.isDirectory()) {
-      const char* name = entry.name();
-      const char* base = strrchr(name, '/');
-      base = base ? base + 1 : name;
-      size_t base_len = strlen(base);
-      if (base_len > 4 && strcmp(base + base_len - 4, ".txt") == 0) {
-        if (lyric_file_count_ < kMaxLyricFiles) {
-          LyricFileInfo& info = lyric_files_[lyric_file_count_];
-          snprintf(info.filename, sizeof(info.filename), "%s/%s", dir_path, base);
-          if (base_len > 4) {
-            snprintf(info.display_name, sizeof(info.display_name), "%.*s",
-                     (int)(base_len - 4), base);
-          } else {
-            snprintf(info.display_name, sizeof(info.display_name), "%s", base);
-          }
-          Serial.print("LYRICS: found ");
-          Serial.println(info.filename);
-          ++lyric_file_count_;
-        }
-      }
-    }
-    entry.close();
-  }
-  dir.close();
-  Serial.print("LYRICS: total ");
-  Serial.println(lyric_file_count_);
-}
-
-bool LyricsApp::LoadLyrics(const char* filename) {
-  if (filename == nullptr) return false;
-  ClearData();
-  File file = storage_service.Open(filename, FILE_READ);
-  if (!file) {
-    Serial.print("LYRICS: open failed: ");
-    Serial.println(filename);
-    return false;
-  }
-  Serial.print("LYRICS: parsing ");
-  Serial.println(filename);
-  char linebuf[512];
-  while (file.available()) {
-    char c = file.read();
-    if (c == '\n' || c == '\r') {
-      if (linebuf[0] != '\0') {
-        linebuf[511] = '\0';
-        ParseLine(linebuf);
-        linebuf[0] = '\0';
-      }
-    } else if (c > 0) {
-      size_t len = strlen(linebuf);
-      if (len < 511) {
-        linebuf[len] = (char)c;
-        linebuf[len + 1] = '\0';
-      }
-    }
-  }
-  if (linebuf[0] != '\0') {
-    linebuf[511] = '\0';
-    ParseLine(linebuf);
-  }
-  file.close();
-  Serial.print("LYRICS: parsed ");
-  Serial.print(word_count_);
-  Serial.println(" words");
-  if (word_count_ == 0) {
-    Serial.println("LYRICS: WARNING - no timestamped words found");
-  }
-  return word_count_ > 0;
 }
 
 void LyricsApp::LoadSelectedLyric() {
-  if (selected_file_index_ >= lyric_file_count_) return;
-  const char* filename = lyric_files_[selected_file_index_].filename;
-  if (!LoadLyrics(filename)) {
-    ShowStatus("Load failed", TextSize::Medium);
-    Serial.print("LYRICS: load failed for: ");
-    Serial.println(filename);
+  if (buffer_count_ == 0) return;
+  uint8_t buf_idx = selected_index_ - buffer_offset_;
+  if (buf_idx >= buffer_count_) return;
+
+  const char* song_name = song_buffer_[buf_idx];
+  ClearData();
+  waiting_for_lyrics_ = true;
+  lyrics_received_ = false;
+
+  char cmd[128];
+  snprintf(cmd, sizeof(cmd), "LYRICS|%s", song_name);
+  if (ble_service.IsConnected()) {
+    ble_service.SendCommand(cmd);
+    Serial.print("BLE TX: ");
+    Serial.println(cmd);
+  } else {
+    Serial.println("BLE: not connected");
+    waiting_for_lyrics_ = false;
+    ShowStatus("No device", TextSize::Medium);
     state_ = State::LoadFailed;
     load_failed_start_ = millis();
     return;
   }
-  EnterLoading();
-  SendPlayCommand(lyric_files_[selected_file_index_].display_name);
-  EnterWaitingHandshake();
-}
 
+  EnterLoading();
+}
 
 // ==========================================================
 // STATE TRANSITIONS
 // ==========================================================
+
+void LyricsApp::EnterWaitingSongs() {
+  state_ = State::WaitingSongs;
+  buffer_offset_ = 0;
+  buffer_count_ = 0;
+  total_songs_ = 0;
+  selected_index_ = 0;
+  waiting_for_songs_ = true;
+  waiting_for_lyrics_ = false;
+  ShowStatus("Connect to PC", TextSize::Medium);
+  if (ble_service.IsConnected()) {
+    RequestSongs(0);
+  }
+}
 
 void LyricsApp::EnterFileList() {
   state_ = State::FileList;
@@ -231,8 +272,13 @@ void LyricsApp::EnterFileList() {
   paused_ = false;
   new_word_ = false;
   display_active_ = false;
-  selected_file_index_ = 0;
-  list_scroll_ = 0;
+  waiting_for_songs_ = false;
+  waiting_for_lyrics_ = false;
+  if (selected_index_ >= total_songs_) selected_index_ = 0;
+  if (buffer_count_ == 0 && total_songs_ > 0) {
+    RequestSongs(0);
+    return;
+  }
   ShowFileList();
 }
 
@@ -244,7 +290,9 @@ void LyricsApp::EnterLoading() {
 void LyricsApp::EnterWaitingHandshake() {
   state_ = State::WaitingHandshake;
   handshake_start_ = millis();
-  ShowStatus("Wait PC", TextSize::Medium);
+  waiting_for_lyrics_ = false;
+  lyrics_received_ = false;
+  ShowStatus("Loading...", TextSize::Medium);
 }
 
 void LyricsApp::EnterPlaying() {
@@ -270,7 +318,13 @@ void LyricsApp::EnterPaused() {
 
 void LyricsApp::ReturnToFileList() {
   StopPlayback();
-  EnterFileList();
+  waiting_for_lyrics_ = false;
+  lyrics_received_ = false;
+  if (total_songs_ == 0) {
+    EnterWaitingSongs();
+  } else {
+    EnterFileList();
+  }
 }
 
 // ==========================================================
@@ -290,11 +344,15 @@ void LyricsApp::StartPlayback() {
 
 void LyricsApp::PausePlayback() {
   if (state_ != State::Playing) return;
+  ble_service.SendCommand("PAUSE");
+  Serial.println("PAUSE");
   EnterPaused();
 }
 
 void LyricsApp::ResumePlayback() {
   if (state_ != State::Paused) return;
+  ble_service.SendCommand("RESUME");
+  Serial.println("RESUME");
   start_time_ += millis() - pause_time_;
   state_ = State::Playing;
   playing_ = true;
@@ -303,6 +361,8 @@ void LyricsApp::ResumePlayback() {
 }
 
 void LyricsApp::StopPlayback() {
+  ble_service.SendCommand("STOP");
+  Serial.println("STOP");
   playing_ = false;
   paused_ = false;
   loaded_ = false;
@@ -316,26 +376,33 @@ void LyricsApp::StopPlayback() {
 // ==========================================================
 
 void LyricsApp::ShowFileList() {
-  if (lyric_file_count_ == 0) {
-    ShowStatus("No lyrics", TextSize::Medium);
+  if (buffer_count_ == 0) {
+    if (waiting_for_songs_) {
+      ShowStatus("Loading...", TextSize::Medium);
+    } else {
+      ShowStatus("Connect to PC", TextSize::Medium);
+    }
     return;
   }
   uint8_t visible = 0;
-  for (uint8_t i = 0; i < kVisibleLines; ++i) {
-    uint8_t idx = list_scroll_ + i;
-    if (idx >= lyric_file_count_) break;
-    visible_lines_[i] = lyric_files_[idx].display_name;
+  for (uint8_t i = 0; i < kWindowSize; ++i) {
+    uint8_t buf_idx = i;
+    if (buf_idx >= buffer_count_) break;
+    visible_lines_[i] = song_buffer_[buf_idx];
     ++visible;
   }
   Event event;
   event.type = EventType::DisplayRequest;
   event.sender = GetAppId();
-  event.display_request.type = DisplayRequestType::ShowLines;
+  event.display_request.type = DisplayRequestType::ShowSongList;
   event.display_request.lines = visible_lines_;
   event.display_request.line_count = visible;
-  event.display_request.selected = selected_file_index_ - list_scroll_;
-  event.display_request.text_size = TextSize::Small;
+  event.display_request.selected = selected_index_ - buffer_offset_;
+  event.display_request.text_size = TextSize::Medium;
   event.display_request.alignment = TextAlign::Left;
+  event.display_request.total_count = total_songs_;
+  event.display_request.has_more_above = buffer_offset_ > 0;
+  event.display_request.has_more_below = buffer_offset_ + buffer_count_ < total_songs_;
   display_active_ = true;
   (void)event_bus.Post(event);
 }
@@ -360,7 +427,7 @@ bool LyricsApp::ShowCurrentWord() {
   event.sender = GetAppId();
   event.display_request.type = DisplayRequestType::ShowWord;
   event.display_request.text = word;
-  event.display_request.text_size = TextSize::Medium;
+  event.display_request.text_size = (strlen(word) > 8) ? TextSize::Medium : TextSize::Large;
   event.display_request.alignment = TextAlign::Center;
   display_active_ = true;
   return (bool)event_bus.Post(event);
@@ -392,7 +459,6 @@ void LyricsApp::SendPlayCommand(const char* song_name) {
   }
 }
 
-
 // ==========================================================
 // HELPERS
 // ==========================================================
@@ -412,6 +478,12 @@ void LyricsApp::ClearData() {
   display_active_ = false;
 }
 
+void LyricsApp::ClearLyricData() {
+  word_count_ = 0;
+  current_word_ = 0;
+  last_shown_word_ = UINT16_MAX;
+}
+
 const char* LyricsApp::GetCurrentWord() const {
   if (!loaded_ || current_word_ >= word_count_) return nullptr;
   return words_[current_word_].word;
@@ -423,6 +495,42 @@ const char* LyricsApp::GetCurrentWord() const {
 
 void LyricsApp::Update() {
   switch (state_) {
+    case State::WaitingSongs: {
+      if (waiting_for_songs_ && song_request_start_ > 0 &&
+          millis() - song_request_start_ > kSongRequestTimeoutMs) {
+        Serial.println("BLE: Song request timeout");
+        ShowStatus("No device", TextSize::Medium);
+        state_ = State::LoadFailed;
+        load_failed_start_ = millis();
+      }
+      break;
+    }
+    case State::FileList: {
+      if (waiting_for_songs_ && song_request_start_ > 0 &&
+          millis() - song_request_start_ > kSongRequestTimeoutMs) {
+        Serial.println("BLE: Song request timeout");
+        ShowStatus("No device", TextSize::Medium);
+        state_ = State::LoadFailed;
+        load_failed_start_ = millis();
+      }
+      break;
+    }
+    case State::Loading: {
+      if (lyrics_received_) {
+        lyrics_received_ = false;
+        EnterWaitingHandshake();
+        SendPlayCommand(song_buffer_[selected_index_ - buffer_offset_]);
+        break;
+      }
+      if (song_request_start_ > 0 &&
+          millis() - song_request_start_ > kSongRequestTimeoutMs) {
+        Serial.println("BLE: Lyrics data timeout");
+        ShowStatus("No device", TextSize::Medium);
+        state_ = State::LoadFailed;
+        load_failed_start_ = millis();
+      }
+      break;
+    }
     case State::WaitingHandshake: {
       if (audio_started_) {
         audio_started_ = false;
@@ -432,19 +540,42 @@ void LyricsApp::Update() {
       }
       if (millis() - handshake_start_ > kHandshakeTimeoutMs) {
         Serial.println("BLE: Handshake timeout");
-        ShowStatus("PC Timeout", TextSize::Medium);
+        static const char* timeout_lines[] = {"No device", "connected"};
+        Event event;
+        event.type = EventType::DisplayRequest;
+        event.sender = GetAppId();
+        event.display_request.type = DisplayRequestType::ShowLines;
+        event.display_request.lines = timeout_lines;
+        event.display_request.line_count = 2;
+        event.display_request.selected = 255;
+        event.display_request.text_size = TextSize::Medium;
+        event.display_request.alignment = TextAlign::Center;
+        display_active_ = true;
+        (void)event_bus.Post(event);
         state_ = State::LoadFailed;
         load_failed_start_ = millis();
       }
       break;
     }
-    case State::LoadFailed: {
-      if (millis() - load_failed_start_ > kLoadFailedTimeoutMs) {
-        ReturnToFileList();
-      }
+    case State::LoadFailed:
       break;
-    }
     case State::Playing: {
+      if (!ble_service.IsConnected()) {
+        StopPlayback();
+        ReturnToFileList();
+        break;
+      }
+      if (playback_ended_) {
+        playback_ended_ = false;
+        StopPlayback();
+        uint8_t next = (selected_index_ + 1) % total_songs_;
+        selected_index_ = next;
+        if (next < buffer_offset_ || next >= buffer_offset_ + buffer_count_) {
+          RequestSongs(next < kWindowSize / 2 ? 0 : next - kWindowSize / 2);
+        }
+        LoadSelectedLyric();
+        break;
+      }
       if (!playing_) return;
       if (millis() < title_until_) return;
       uint32_t elapsed = millis() - start_time_;
@@ -460,6 +591,14 @@ void LyricsApp::Update() {
       if (!display_active_) return;
       if (millis() - word_display_start_ < kWordDisplayTimeoutMs) return;
       ClearDisplay();
+      break;
+    }
+    case State::Paused: {
+      if (!ble_service.IsConnected()) {
+        StopPlayback();
+        ReturnToFileList();
+        break;
+      }
       break;
     }
     default:
@@ -504,6 +643,7 @@ bool LyricsApp::ParseLine(const char* line) {
   }
   return added_any;
 }
+
 bool LyricsApp::ParseWordTimestamp(const char* text, uint32_t& milliseconds, uint8_t& consumed) {
   if (text == nullptr || strlen(text) < 10) return false;
   if (text[0] != '<' || text[3] != ':' || text[6] != '.' || text[9] != '>') return false;

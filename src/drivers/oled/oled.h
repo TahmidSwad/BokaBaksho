@@ -18,7 +18,8 @@ public:
   enum class Font {
     Small,
     Medium,
-    Large
+    Large,
+    LargeBold
   };
 
   bool Begin();
@@ -38,11 +39,13 @@ public:
   void DrawText(int16_t x, int16_t y, const char* text);
   int16_t GetTextWidth(const char* text);
   int16_t GetTextHeight();
+  int16_t GetAscent();
 
   // Graphics
   void DrawLine(int16_t x1, int16_t y1, int16_t x2, int16_t y2);
   void DrawRect(int16_t x, int16_t y, int16_t width, int16_t height);
   void FillRect(int16_t x, int16_t y, int16_t width, int16_t height);
+  void SetDrawColor(uint8_t color);
 
 private:
   // Returns true if an I2C device acknowledges at `address`.

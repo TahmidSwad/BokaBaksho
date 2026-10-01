@@ -30,6 +30,7 @@ void StopwatchApp::OnDeactivate() {
 bool StopwatchApp::HandleInput(const InputEvent& event) {
   switch (event.type) {
     case InputType::RotateRight:
+    case InputType::ButtonIncrement:
       if (running_ || finished_) return true;   // lock while active
       if (timer_set_min_ < 65535U) {
         ++timer_set_min_;
@@ -40,6 +41,7 @@ bool StopwatchApp::HandleInput(const InputEvent& event) {
       return true;
 
     case InputType::RotateLeft:
+    case InputType::ButtonDecrement:
       if (running_ || finished_) return true;   // lock while active
       if (timer_set_min_ > 0) {
         --timer_set_min_;

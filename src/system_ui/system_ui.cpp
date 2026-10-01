@@ -8,16 +8,11 @@ SystemUi system_ui;
 bool SystemUi::Begin() {
   selection_ = 0;
   screensaver_active_ = true;
-  return true;
-}
-
-bool SystemUi::OnActivate() {
-  screensaver_active_ = true;
-  base_state_ = CatState::Sleepy;
-  draw_state_ = CatState::Sleepy;
+  base_state_ = CatState::Neutral;
+  draw_state_ = CatState::Neutral;
   cat_y_offset_ = 0;
   is_blinking_ = false;
-  sleepy_mode_ = true;
+  sleepy_mode_ = false;
   look_dir_ = 0;
   is_looking_ = false;
   next_look_time_ = millis() + random(6000, 10000);
@@ -27,6 +22,11 @@ bool SystemUi::OnActivate() {
   hold_duration_ = random(6000, 12000);
   next_blink_time_ = millis() + random(1000, 2000);
   return ShowScreensaver();
+}
+
+bool SystemUi::OnActivate() {
+  screensaver_active_ = false;
+  return ShowMenu();
 }
 
 void SystemUi::OnDeactivate() {
@@ -57,7 +57,7 @@ void SystemUi::PickNextExpression() {
         base_state_ = CatState::Sad;
         break;
       case 3:
-        base_state_ = CatState::Sleepy;
+  base_state_ = CatState::Neutral;
         break;
       case 4:
         base_state_ = CatState::Angry;
@@ -196,7 +196,21 @@ bool SystemUi::HandleInput(const InputEvent& event) {
     }
 
     case InputType::Back:
-      return false;
+      screensaver_active_ = true;
+      base_state_ = CatState::Sleepy;
+      draw_state_ = CatState::Sleepy;
+      cat_y_offset_ = 0;
+      is_blinking_ = false;
+      sleepy_mode_ = true;
+      look_dir_ = 0;
+      is_looking_ = false;
+      next_look_time_ = millis() + random(6000, 10000);
+      next_neutral_blink_ = millis() + random(2500, 6000);
+      in_expression_ = true;
+      hold_start_ = millis();
+      hold_duration_ = random(6000, 12000);
+      next_blink_time_ = millis() + random(1000, 2000);
+      return ShowScreensaver();
   }
   return true;
 }

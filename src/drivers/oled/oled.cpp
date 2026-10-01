@@ -102,13 +102,16 @@ void Oled::Update() {
 void Oled::SetFont(Font font) {
   switch (font) {
     case Font::Small:
-      u8g2.setFont(u8g2_font_6x10_tf);
+      u8g2.setFont(u8g2_font_courR08_tr);
       break;
     case Font::Medium:
-      u8g2.setFont(u8g2_font_10x20_tf);
+      u8g2.setFont(u8g2_font_courR10_tr);
       break;
     case Font::Large:
-      u8g2.setFont(u8g2_font_helvB18_tf);
+      u8g2.setFont(u8g2_font_courR18_tr);
+      break;
+    case Font::LargeBold:
+      u8g2.setFont(u8g2_font_bubble_tn);
       break;
   }
 }
@@ -129,6 +132,10 @@ int16_t Oled::GetTextHeight() {
   return u8g2.getAscent() - u8g2.getDescent();
 }
 
+int16_t Oled::GetAscent() {
+  return u8g2.getAscent();
+}
+
 // ============================================================
 // GRAPHICS
 // ============================================================
@@ -143,4 +150,8 @@ void Oled::DrawRect(int16_t x, int16_t y, int16_t width, int16_t height) {
 
 void Oled::FillRect(int16_t x, int16_t y, int16_t width, int16_t height) {
   u8g2.drawBox(x, y, width, height);
+}
+
+void Oled::SetDrawColor(uint8_t color) {
+  u8g2.setDrawColor(color);
 }

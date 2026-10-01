@@ -38,6 +38,7 @@ enum class DisplayRequestType {
   ShowWord,
   ShowLine,
   ShowLines,
+  ShowSongList,
   ShowAppMenu,
   ShowBigTime,
   ShowScreensaver,

@@ -72,24 +72,31 @@ void loop() {
 void onBleCommand(const char* cmd) {
   if (cmd == nullptr) return;
 
-  // Parse AUDIO_STARTED -> start lyrics from beginning
   if (strcmp(cmd, "AUDIO_STARTED") == 0) {
     lyrics_app.OnAudioStarted();
   }
-  // STOPPED -> stop lyrics playback
+  else if (strcmp(cmd, "END") == 0) {
+    lyrics_app.OnPlaybackEnded();
+  }
+  else if (strcmp(cmd, "LYRICS_END") == 0) {
+    lyrics_app.OnLyricsEnd();
+  }
+  else if (strncmp(cmd, "SONGS|", 6) == 0) {
+    lyrics_app.OnSongListReceived(cmd + 6);
+  }
+  else if (strncmp(cmd, "TOTAL_SONGS|", 12) == 0) {
+    uint8_t total = atoi(cmd + 12);
+    lyrics_app.OnTotalSongs(total);
+  }
+  else if (strncmp(cmd, "LYRICS_DATA|", 12) == 0) {
+    lyrics_app.OnLyricsData(cmd + 12);
+  }
   else if (strcmp(cmd, "STOPPED") == 0) {
-    // lyrics_app will handle this via its own state
   }
-  // PAUSED -> pause lyrics
   else if (strcmp(cmd, "PAUSED") == 0) {
-    // lyrics_app handles pause internally
   }
-  // RESUME -> resume lyrics
   else if (strcmp(cmd, "RESUMED") == 0) {
-    // lyrics_app handles resume internally
   }
-  // TIME_ACK|<ms> -> could sync lyric timing
   else if (strncmp(cmd, "TIME_ACK|", 9) == 0) {
-    // Could use for synchronization if needed
   }
 }

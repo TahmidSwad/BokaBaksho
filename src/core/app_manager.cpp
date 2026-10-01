@@ -30,7 +30,6 @@ IApp* AppManager::GetAppAt(uint8_t index) const {
 
 bool AppManager::Boot(IApp* system_ui) {
   if (system_ui == nullptr || depth_ != 0) return false;
-  if (!system_ui->OnActivate()) return false;
 
   stack_[0] = system_ui;
   depth_ = 1;

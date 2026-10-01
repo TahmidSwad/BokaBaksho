@@ -37,6 +37,9 @@ void DisplayService::OnEvent(const Event& event) {
     case DisplayRequestType::ShowLines:
       ShowLines(req);
       break;
+    case DisplayRequestType::ShowSongList:
+      ShowSongList(req);
+      break;
     case DisplayRequestType::ShowAppMenu:
       ShowAppMenu(req);
       break;
@@ -108,6 +111,60 @@ void DisplayService::ShowLines(const DisplayRequest& req) {
 }
 
 // ==========================================================
+// SHOW SONG LIST
+// ==========================================================
+
+void DisplayService::ShowSongList(const DisplayRequest& req) {
+  if (req.lines == nullptr || req.line_count == 0) return;
+  oled.Clear();
+
+  oled.SetFont(Oled::Font::Medium);
+  int16_t line_h = oled.GetTextHeight();
+  int16_t accent = oled.GetAscent();
+  int16_t pad_x = 8;
+  int16_t pad_top = 2;
+  int16_t start_y = pad_top + accent;
+
+  bool has_sel = req.selected < req.line_count;
+  int16_t sel_abs = has_sel ? (int16_t)req.selected : -1;
+
+  for (uint8_t i = 0; i < req.line_count; ++i) {
+    int16_t y = start_y + i * line_h;
+    if ((int16_t)i == sel_abs) {
+      oled.DrawText(0, y, ">");
+      oled.DrawText(pad_x, y, req.lines[i]);
+    } else {
+      oled.DrawText(pad_x, y, req.lines[i]);
+    }
+  }
+
+  if (req.has_more_above) {
+    oled.SetFont(Oled::Font::Small);
+    const char* arrow = "^";
+    int16_t aw = oled.GetTextWidth(arrow);
+    oled.DrawText((oled.Width() - aw) / 2, oled.GetAscent(), arrow);
+  }
+
+  if (req.has_more_below) {
+    oled.SetFont(Oled::Font::Small);
+    const char* arrow = "v";
+    int16_t aw = oled.GetTextWidth(arrow);
+    int16_t bottom_y = oled.Height() - 1;
+    oled.DrawText((oled.Width() - aw) / 2, bottom_y, arrow);
+  }
+
+  static char counter_buf[8];
+  int16_t abs_idx = has_sel ? (req.selected + 1) : 0;
+  snprintf(counter_buf, sizeof(counter_buf), "%d / %d", abs_idx, req.total_count);
+  oled.SetFont(Oled::Font::Small);
+  int16_t cw = oled.GetTextWidth(counter_buf);
+  int16_t counter_y = oled.Height() - 1;
+  oled.DrawText(oled.Width() - cw - 2, counter_y, counter_buf);
+
+  oled.Update();
+}
+
+// ==========================================================
 // SHOW APP MENU
 // ==========================================================
 
@@ -118,41 +175,16 @@ void DisplayService::ShowAppMenu(const DisplayRequest& req) {
 
   uint8_t count = req.line_count;
   uint8_t sel = (req.selected < count) ? req.selected : (uint8_t)(count - 1);
-  const char* prev_name = (count > 1) ? req.lines[(sel + count - 1) % count] : nullptr;
   const char* current_name = req.lines[sel];
-  const char* next_name = (count > 1) ? req.lines[(sel + 1) % count] : nullptr;
 
-  // Previous app (top, small).
-  if (prev_name != nullptr) {
-    oled.SetFont(Oled::Font::Small);
-    int16_t topY = 4;
-    int16_t prevW = oled.GetTextWidth(prev_name);
-    if (prevW < oled.Width() - 12) {
-      oled.DrawText(6, topY, prev_name);
-      oled.DrawText(0, topY, "<");
-    }
-  }
-
-  // Next app (top right, small).
-  if (next_name != nullptr) {
-    oled.SetFont(Oled::Font::Small);
-    int16_t topY = 4;
-    int16_t nextW = oled.GetTextWidth(next_name);
-    if (nextW < oled.Width() - 12) {
-      oled.DrawText(oled.Width() - nextW - 6, topY, next_name);
-      oled.DrawText(oled.Width() - 6, topY, ">");
-    }
-  }
-
-  // Current app (center, large).
-  oled.SetFont(Oled::Font::Medium);
-  int16_t x = (oled.Width() - oled.GetTextWidth(current_name)) / 2;
-  if (x < 0) x = 0;
-  int16_t y = (oled.Height() + oled.GetTextHeight()) / 2;
+  // Current app (centered both axes).
+  oled.SetFont(Oled::Font::Large);
+  int16_t x = CalculateX(current_name, TextAlign::Center);
+  int16_t y = CalculateCenteredY();
   oled.DrawText(x, y, current_name);
 
   // Pagination dots.
-  oled.SetFont(Oled::Font::Small);
+  oled.SetFont(Oled::Font::Medium);
   int16_t dot_y = oled.Height() - 10;
   int16_t dot_spacing = 8;
   int16_t dots_width = count * dot_spacing;
@@ -294,16 +326,16 @@ void DisplayService::ShowBigTime(const DisplayRequest& req) {
 
   // Top label (small font).
   if (req.top_label != nullptr) {
-    oled.SetFont(Oled::Font::Small);
+    oled.SetFont(Oled::Font::Medium);
     int16_t x = CalculateX(req.top_label, req.alignment);
     oled.DrawText(x, 12, req.top_label);
   }
 
-  // Big time (large font, centered) - hidden while blinking.
+  // Big time (large bold font, centered) - hidden while blinking.
   if (req.big_time != nullptr && !req.blink) {
-    oled.SetFont(Oled::Font::Large);
+    oled.SetFont(Oled::Font::LargeBold);
     int16_t x = CalculateX(req.big_time, req.alignment);
-    int16_t y = (oled.Height() + oled.GetTextHeight()) / 2;
+    int16_t y = CalculateCenteredY();
     oled.DrawText(x, y, req.big_time);
   }
 
@@ -311,7 +343,7 @@ void DisplayService::ShowBigTime(const DisplayRequest& req) {
   if (req.bottom_status != nullptr) {
     oled.SetFont(Oled::Font::Small);
     int16_t x = CalculateX(req.bottom_status, req.alignment);
-    oled.DrawText(x, oled.Height() - 4, req.bottom_status);
+    oled.DrawText(x, oled.Height() - 9, req.bottom_status);
   }
 
   oled.Update();
@@ -369,5 +401,5 @@ int16_t DisplayService::CalculateX(const char* text, TextAlign align) {
 int16_t DisplayService::CalculateCenteredY() {
   int16_t screen_height = oled.Height();
   int16_t text_height = oled.GetTextHeight();
-  return (screen_height + text_height) / 2;
+  return (screen_height - text_height) / 2 + oled.GetAscent();
 }
