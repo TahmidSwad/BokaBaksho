@@ -22,3 +22,11 @@ _exitcode.txt
 # OS
 .DS_Store
 Thumbs.db
+# Python / PC companion
+.venv/
+venv/
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec

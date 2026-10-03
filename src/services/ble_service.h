@@ -14,28 +14,32 @@
 // BLE SERVICE
 // ==========================================================
 // A BLE GATT-based command/response protocol for the
-// BoomBox2 lyric synchronization system.
+// Boka_Baksho lyric synchronization system.
 //
 // GATT layout:
 //   Service   UUID: 12345678-1234-5678-9abc-def012345678
 //   TX Char   UUID: 12345678-1234-5678-9abc-def012345679  (NOTIFY)
 //   RX Char   UUID: 12345678-1234-5678-9abc-def012345680  (WRITE)
 //
-// Protocol (plain text, newline-terminated):
+// Protocol (plain text, newline-terminated). See docs/ble-protocol.md
+// for the full specification.
 //
-//   ESP32 -> Python (via TX notify):
-//     PLAY|song_name.mp3
-//     STOP
+//   ESP32 -> PC (via TX notify):
+//     REQUEST_SONGS|<offset>|<count>
+//     LYRICS|<song_name>
+//     PLAY|<song_name>
 //     PAUSE
 //     RESUME
-//     TIME_SYNC|<ms_since_start>
+//     STOP
 //
-//   Python -> ESP32 (via RX write):
+//   PC -> ESP32 (via RX write):
+//     TOTAL_SONGS|<n>
+//     SONGS|<name>|<name>|...
+//     LYRICS_DATA|<lyric line>
+//     LYRICS_END
 //     AUDIO_STARTED
-//     STOPPED
-//     PAUSED
-//     RESUMED
-//     TIME_ACK|<ms_since_start>
+//     END
+//     STOPPED / PAUSED / RESUMED        (received, currently ignored)
 //
 // ==========================================================
 

@@ -1,0 +1,13 @@
+# Boka_Baksho PC companion — Python dependencies
+#
+#   pip install -r requirements.txt
+#
+# Python 3.10+ (verified on 3.14).
+
+# --- runtime ---------------------------------------------------------
+bleak>=1.0          # BLE client (BlueZ / WinRT / CoreBluetooth)
+pygame-ce>=2.5      # audio playback; provides the `pygame` module.
+                    # Upstream `pygame` has no Python 3.14 wheel — use this.
+
+# --- build (only needed to produce an executable) --------------------
+pyinstaller>=6.0

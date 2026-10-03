@@ -235,6 +235,11 @@ void LyricsApp::LoadSelectedLyric() {
     ble_service.SendCommand(cmd);
     Serial.print("BLE TX: ");
     Serial.println(cmd);
+    // Re-arm the request timeout for this new request. song_request_start_
+    // is otherwise only written by RequestSongs(), so without this the
+    // lyrics timeout would be measured from the song-list request and any
+    // list shown for longer than kSongRequestTimeoutMs would fail instantly.
+    song_request_start_ = millis();
   } else {
     Serial.println("BLE: not connected");
     waiting_for_lyrics_ = false;
