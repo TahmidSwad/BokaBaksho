@@ -216,6 +216,11 @@ sudo apt install python3-tk           # Debian / Ubuntu
 A working audio device is not required to start; the window opens and reports
 `Audio unavailable` in the log if the mixer cannot be initialised.
 
+**The default media folder is `~/Music/SongWithLyrics`.** The app only reads
+it and never creates it — if the path does not exist the song-count label
+shows `folder not found`, one log line names the path, and no `SONGS` write
+reaches the device. Point the app at another folder with **Browse…**.
+
 ### 6.2 Build a standalone executable
 
 ```sh
@@ -235,12 +240,12 @@ Artifacts land in `build/`, `dist/`, and `*.spec`; all three are gitignored.
 .venv/bin/python -m pc_client.selftest
 ```
 
-34 checks covering command parsing, library and audio-file resolution, the
+36 checks covering command parsing, library and audio-file resolution, the
 `REQUEST_SONGS` guards, atomic `TOTAL_SONGS`+`SONGS`, lyric streaming, MTU
 packing, adaptive batch splitting, command dispatch, and the disconnected-send
 guard. Exit status 0 means every check passed.
 
-**Verified 2026-10-03: 34/34 passed.**
+**Verified 2026-10-03: 36/36 passed.**
 
 ### 6.4 Dependencies
 

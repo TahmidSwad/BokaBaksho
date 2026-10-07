@@ -567,6 +567,9 @@ class BLEAudioClient:
     # ==================================================================
 
     def _songs(self):
+        if not os.path.isdir(self.media_dir):
+            self.log(f"Media folder does not exist: {self.media_dir}")
+            return []
         try:
             entries = os.listdir(self.media_dir)
         except Exception as exc:
@@ -583,7 +586,9 @@ class BLEAudioClient:
     def _push_library(self):
         songs = self._songs()
         if not songs:
-            self.log("Media folder has no .txt lyric files.")
+            # _songs() already said whether the folder is missing or unreadable.
+            if os.path.isdir(self.media_dir):
+                self.log("Media folder has no .txt lyric files.")
             return
         # TOTAL_SONGS and SONGS go out in a single write so they cannot be
         # reordered relative to each other.

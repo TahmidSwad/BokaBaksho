@@ -4,6 +4,41 @@ Newest entries first. All dates are the date the change was made.
 
 ---
 
+## 2026-10-04 — PC companion: default media folder, and it never creates one
+
+- **Changed** `gui.DEFAULT_FOLDER` from `~/BokaBaksho` to
+  `~/Music/SongWithLyrics` (the user's actual library).
+- **Bug.** `_set_media_dir()` called `os.makedirs(path, exist_ok=True)` and ran
+  at startup, so the first launch created an **empty** `~/BokaBaksho`. An empty
+  folder has no `.txt` files, so `_songs()` returned `[]` and the device was
+  never sent a `SONGS` write — on the ESP32 side that reads as a failed library
+  hand-off, indistinguishable from a BLE fault. (Reproduced: `~/BokaBaksho`
+  existed, contained nothing, and the user's real library had been reached only
+  by pressing **Browse…**.)
+- **Fix:** removed the `os.makedirs` call; the app now only reads. A missing
+  path shows `folder not found` in the song-count label plus one log line,
+  `_songs()` logs `Media folder does not exist: …`, and `_push_library()`
+  sends nothing — it still never writes an empty `SONGS|`.
+- **Tests:** two new self-test checks — the default resolves to
+  `~/Music/SongWithLyrics`, and no `pc_client` module contains
+  `os.makedirs` / `os.mkdir` / `.mkdir(` (`selftest.py` itself is skipped: it
+  holds the needle strings and legitimately uses `tempfile.mkdtemp` for its own
+  fixture in the system temp directory). **34 → 36 checks.**
+- **Verified:** `python -m pc_client.selftest` → 36/36; `pio run` succeeds
+  (unchanged firmware); GUI run against the real folder lists `2 songs`, and
+  pointing it at a nonexistent path left it nonexistent on disk and produced no
+  `SONGS` write; `./build_client.sh` rebuilt `dist/BokaBakshoCompanion`, whose
+  embedded `pc_client.gui` constants contain `~/Music/SongWithLyrics` and no
+  `~/BokaBaksho`; the packaged window opened and created no directory.
+- **Cleanup:** removed the empty `~/BokaBaksho` the old code had created.
+- **Docs:** `README.md` (ASCII sketch + media-folder paragraph),
+  `build-and-test.md` §6.1, `api-reference.md` §7.4 (`DEFAULT_FOLDER` row and
+  the `_set_media_dir` row), `current-state.md` §1.8, and the check count in
+  `README.md`, `build-and-test.md`, `api-reference.md`, `current-state.md`,
+  `roadmap.md` §4.5, and this file.
+
+---
+
 ## 2026-10-03 — Fix: lyric timeout measured from the song list, not from `ENTER`
 
 - **Bug.** `LyricsApp::song_request_start_` had exactly one writer,
@@ -43,7 +78,7 @@ Newest entries first. All dates are the date the change was made.
   (`pygame.mixer` state machine plus an end-of-song `END` monitor), `ble.py`
   (dedicated asyncio thread, one worker thread per inbound command,
   serialised writes), `gui.py` (minimal window), `main.py` (wiring), and
-  `selftest.py` (34 transport-stubbed checks).
+  `selftest.py` (36 transport-stubbed checks).
 - **Added** `run_companion.py` (entry point), `requirements.txt`,
   `build_client.sh` and `build_client.bat` (PyInstaller `--onefile
   --windowed`), and gitignored `.venv/`, `build/`, `dist/`, `*.spec`.
@@ -65,7 +100,7 @@ Newest entries first. All dates are the date the change was made.
   [§5.2 in `ble-protocol.md`](ble-protocol.md#52-reference-implementation-pc_client)
   mapping the reference client against the requirement list, a PC Companion
   section in `README.md`, and roadmap items 1.8 and 4.5.
-- **Verified:** `python -m pc_client.selftest` → 34/34; `pio run` succeeds
+- **Verified:** `python -m pc_client.selftest` → 36/36; `pio run` succeeds
   (RAM 23.9%, Flash 38.7%); PyInstaller build succeeds and the packaged window
   opens. **Not verified:** any BLE session against real hardware.
 

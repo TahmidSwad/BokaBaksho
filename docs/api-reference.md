@@ -592,9 +592,10 @@ by `command_lock`; outbound writes by `send_lock` (acquired **inside**
 | Member | Behaviour |
 |---|---|
 | `run(client, player, events)` | module entry — builds `Tk` and enters `mainloop()` |
+| `DEFAULT_FOLDER` | `~/Music/SongWithLyrics` — the default media directory, **read only** |
 | `_poll_events()` | `root.after(100, …)`; drains the queue, then reschedules itself |
 | `_connect()` / `_disconnect()` | button handlers; visual state is restored by the `connection` event, not set locally |
-| `_set_media_dir(path)` / `_load_song_list()` | creates the folder if missing, rebuilds the listbox from `*.txt` |
+| `_set_media_dir(path)` / `_load_song_list()` | points at a folder and rebuilds the listbox from `*.txt`. **Never creates the directory** — a missing one shows `folder not found` in the count label and one log line |
 | `_set_song()` / `_set_playing()` / `_highlight_song()` | now-playing panel and the listbox selection |
 | `_on_close()` | `WM_DELETE_WINDOW` → shut down the client, the player, then the window |
 
@@ -603,4 +604,4 @@ by `command_lock`; outbound writes by `send_lock` (acquired **inside**
 | Entry point | Role |
 |---|---|
 | `python -m pc_client` / `run_companion.py` | `main.run()` — builds player, client, GUI, and reports a missing dependency as a message box |
-| `python -m pc_client.selftest` | 34 transport-stubbed checks; exit status 0 means all passed |
+| `python -m pc_client.selftest` | 36 transport-stubbed checks; exit status 0 means all passed |

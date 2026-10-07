@@ -16,7 +16,8 @@ from tkinter import filedialog, messagebox, ttk
 from . import audio, protocol
 
 POLL_MS = 100
-DEFAULT_FOLDER = os.path.join(os.path.expanduser("~"), "BokaBaksho")
+# The default media library. It is only ever read — the app never creates it.
+DEFAULT_FOLDER = os.path.expanduser("~/Music/SongWithLyrics")
 
 GREEN = "#2e9e5b"
 RED = "#d0492f"
@@ -221,11 +222,9 @@ class CompanionApp:
 
     def _set_media_dir(self, path, quiet=False):
         path = os.path.abspath(os.path.expanduser(path))
-        try:
-            os.makedirs(path, exist_ok=True)
-        except OSError as exc:
-            self.log(f"Cannot create folder: {exc}")
-            return
+        # Deliberately never created: an empty folder would silently produce
+        # an empty library on the device, which looks like a BLE fault.
+        # A missing folder is reported by _load_song_list() instead.
         self.media_dir = path
         self.folder_var.set(path)
         self.client.set_media_dir(path)
@@ -235,6 +234,12 @@ class CompanionApp:
 
     def _load_song_list(self):
         self.song_list.delete(0, tk.END)
+
+        if not os.path.isdir(self.media_dir):
+            self.songs_count.config(text="folder not found")
+            self.log(f"Folder not found: {self.media_dir}")
+            return
+
         try:
             entries = os.listdir(self.media_dir)
         except OSError as exc:

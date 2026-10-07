@@ -87,7 +87,9 @@ The ESP32 has no audio hardware, so the device is unusable without it.
 - **GUI** (`gui.py`) — connect/disconnect, media-folder picker with Refresh,
   song list with the playing track highlighted, now-playing panel, scrolling
   log. State changes arrive from the BLE thread through a `queue.Queue` drained
-  by `root.after(100, …)`; the Tk thread never touches the radio.
+  by `root.after(100, …)`; the Tk thread never touches the radio. The default
+  folder is `~/Music/SongWithLyrics`, which is **read only** — a missing path
+  yields `folder not found` and no filesystem writes.
 - **BLE link** (`ble.py`) — dedicated asyncio thread, inbound line buffering
   across notifications, one worker thread per inbound command (so streaming
   lyrics cannot delay a `STOP`), outbound writes serialised so ordering is
@@ -96,9 +98,9 @@ The ESP32 has no audio hardware, so the device is unusable without it.
   (IDLE / LOADED / PLAYING / PAUSED / STOPPED) plus an end-of-song monitor that
   sends `END`.
 - **Protocol** (`protocol.py`) — UUIDs, framing, command parsing/building.
-- **Self-test** (`selftest.py`) — 34 checks with the transport stubbed.
+- **Self-test** (`selftest.py`) — 36 checks with the transport stubbed.
 
-**Verified 2026-10-03:** `python -m pc_client.selftest` → 34/34 passed;
+**Verified 2026-10-03:** `python -m pc_client.selftest` → 36/36 passed;
 `pio run` succeeds; the PyInstaller build succeeds and its window opens.
 **Not verified:** any BLE session against real hardware — no ESP32 has been
 attached to this client. See [build-and-test.md §6.5](build-and-test.md#65-not-yet-verified).
@@ -121,7 +123,7 @@ attached to this client. See [build-and-test.md §6.5](build-and-test.md#65-not-
 | **`config::kLyricsPathA/B`** | Defined in `config.h`; **never referenced**. |
 | **StorageService consumers** | Mounts fatally at boot, but no code reads or writes files. |
 | **Test suite** | `test/README.md` describes a Unity/native suite; no test files and no `native` environment exist. |
-| **PC companion** (`pc_client/`) | Implemented and self-tested (34/34), packaged successfully — but **never run against a real ESP32**; Windows/macOS builds untested. |
+| **PC companion** (`pc_client/`) | Implemented and self-tested (36/36), packaged successfully — but **never run against a real ESP32**; Windows/macOS builds untested. |
 
 ---
 

@@ -233,6 +233,37 @@ def test_file_resolution(client):
           client._find_lyrics_file("Nope") is None)
 
 
+def test_no_side_effects():
+    """The shipped app must never create directories on the user's disk.
+
+    (``selftest.py`` still uses ``tempfile.mkdtemp`` for its own fixture —
+    that is a system temp directory, not a library folder.)
+    """
+    import os
+
+    from . import gui
+
+    section("filesystem side effects")
+
+    check("default media folder is ~/Music/SongWithLyrics",
+          gui.DEFAULT_FOLDER == os.path.expanduser("~/Music/SongWithLyrics"),
+          gui.DEFAULT_FOLDER)
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    needles = ("os.makedirs", "os.mkdir", ".mkdir(")
+    offenders = []
+    for name in sorted(os.listdir(here)):
+        if not name.endswith(".py") or name == os.path.basename(__file__):
+            continue  # this module holds the needles themselves
+        with open(os.path.join(here, name), encoding="utf-8") as handle:
+            source = handle.read()
+        for call in needles:
+            if call in source:
+                offenders.append(f"{name}: {call}")
+    check("no pc_client module creates a directory",
+          not offenders, "found " + ", ".join(offenders))
+
+
 # ======================================================================
 def make_tmp_media():
     import os
@@ -269,6 +300,7 @@ def main():
     test_adaptive_split(client, sent)
     test_dispatch(client)
     test_guards(client, sent)
+    test_no_side_effects()
 
     try:
         client.player.shutdown()

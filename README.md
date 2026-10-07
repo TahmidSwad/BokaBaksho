@@ -169,22 +169,26 @@ It is a small tkinter window that scans for `BokaBaksho` and speaks the
 protocol in [`docs/ble-protocol.md`](docs/ble-protocol.md).
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│ BokaBaksho Companion                   ● Disconnected      │
-│ [Connect] [Disconnect]   Folder [ ~/BokaBaksho ] [Browse]  │
-│ Songs                       │ Now playing                  │
-│  Tumi                       │  —                           │
-│  Closer                     │  Stopped                     │
-│  …                          │  Device BokaBaksho           │
-│ Log                                                     [Clear]
-│ [22:41:03] Connected — subscribed to TX notifications.     │
-└────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────┐
+│ BokaBaksho Companion                                    ● Disconnected        │
+│ [Connect] [Disconnect]  Folder [ ~/Music/SongWithLyrics ]  [Browse] [Refresh] │
+│ Songs                      │ Now playing                                      │
+│  Tumi                      │  —                                               │
+│  Closer                    │  Stopped                                         │
+│  …                         │  Device BokaBaksho                               │
+│ Log                                                        [Clear]            │
+│ [22:41:03] Connected — subscribed to TX notifications.                        │
+└────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-The media folder (`~/BokaBaksho` by default, created on first run) needs one
+The media folder defaults to `~/Music/SongWithLyrics`. It needs one
 `<Song>.txt` lyric file per song, plus a matching audio file with the same
 basename in `.mp3`, `.wav`, `.ogg`, `.m4a`, or `.flac`. The list of `.txt`
 files *is* the library.
+
+**The app never creates this folder.** If it is missing, the window shows
+`folder not found`, the log names the path, and nothing is written to disk —
+use **Browse…** to point at a different one.
 
 ### Run from source
 
@@ -211,7 +215,7 @@ build_client.bat           # -> dist\BokaBakshoCompanion.exe
 .venv/bin/python -m pc_client.selftest
 ```
 
-**Verified 2026-10-03:** self-test 34/34 passed, `pio run` succeeds, the
+**Verified 2026-10-03:** self-test 36/36 passed, `pio run` succeeds, the
 PyInstaller build succeeds and its window opens. **Not verified:** an actual
 BLE session against an ESP32 — no hardware has been attached to this client.
 Details: [`docs/build-and-test.md` §6](docs/build-and-test.md#6-pc-companion-client).

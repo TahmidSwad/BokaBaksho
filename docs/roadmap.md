@@ -56,7 +56,7 @@ in [current-state.md](current-state.md).
 | 4.2 | Write the `EventBus` and `AppManager` unit tests promised by `test/README.md` |
 | 4.3 | Provide an Arduino shim so `core/` headers compile on the host |
 | 4.4 | Replace the machine-specific `build_pio.bat` / `scripts/do_build.ps1` with portable scripts, and remove or implement `scripts/run_build.ps1` |
-| 4.5 | Run `pc_client/` against a real ESP32 over BLE — the reference client requested here now exists and passes its 34-check self-test, but has never been attached to hardware; also exercise the Windows and macOS builds |
+| 4.5 | Run `pc_client/` against a real ESP32 over BLE — the reference client requested here now exists and passes its 36-check self-test, but has never been attached to hardware; also exercise the Windows and macOS builds |
 
 ---
 
