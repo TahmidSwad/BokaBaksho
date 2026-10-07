@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Build the Boka_Baksho PC companion into a standalone executable.
+# Build the BokaBaksho PC companion into a standalone executable.
 #
 #   ./build_client.sh
 #

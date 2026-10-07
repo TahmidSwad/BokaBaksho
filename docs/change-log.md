@@ -4,6 +4,47 @@ Newest entries first. All dates are the date the change was made.
 
 ---
 
+## 2026-10-08 — Project renamed from *Boka_Baksho* to *BokaBaksho*
+
+- **Renamed the project** so that the project, the repository, the local
+  checkout, the GUI window title, and the BLE advertised name all agree on
+  **`BokaBaksho`** — no space, no underscore.
+- **Scope:** 28 occurrences in 21 tracked files — the README title and prose,
+  every `docs/` heading and intro line, the Python module docstrings, the
+  `selftest.py` banner, build-script comments, `requirements.txt`, and the
+  `src/services/ble_service.h` header comment. **No code was renamed:**
+  nothing used `Boka_Baksho` as an identifier — no imports, no module names,
+  no symbols.
+- **`platformio.ini`** gained `[platformio] name = BokaBaksho`, so the
+  firmware project name no longer falls back to the directory name.
+- **Unchanged by design:** the BLE advertised name `BokaBaksho`, the window
+  title `BokaBaksho Companion`, the executable `BokaBakshoCompanion`, the
+  Python package `pc_client`, the board env `esp32doit-devkit-v1`, and the
+  media folder `~/Music/SongWithLyrics`.
+- **Renamed the local checkout** to
+  `~/Desktop/Projects/HobbyProjects/BokaBaksho` and **the GitHub repository**
+  to `TahmidSwad/BokaBaksho`, with `origin` re-pointed at the new URL
+  (GitHub redirects the old one, but the remote no longer depends on it).
+- **Regenerated after the directory move** — all of these embed absolute
+  paths: `.venv` (entry-point scripts carry absolute shebangs; `.venv/bin/pip`
+  failed with `bad interpreter` until it was recreated), `.pio/`, and
+  `.vscode/{c_cpp_properties,launch}.json`; `dist/BokaBakshoCompanion` was
+  rebuilt. `README.md` and `build-and-test.md` §6.1 now invoke pip as
+  `.venv/bin/python -m pip`, which survives a directory move.
+- **Docs:** `README.md` records both renames; the `docs/index.md` naming
+  convention line collapsed into a single spelling; the historical entries
+  above rewritten to the current spelling. One intentional holdout remains —
+  `README.md:11` still names `*Boka_Baksho*`, because that line *is* the
+  rename history.
+- **Verified after the move:** `pio run` SUCCESS — RAM 23.9% (78,440), Flash
+  38.7% (1,216,249), byte-identical to the pre-rename build;
+  `python -m pc_client.selftest` → 36/36; link check 98 links, 0 broken;
+  `pio project config` reports `name = BokaBaksho`; `git ls-remote origin`
+  reaches the renamed repository; `dist/BokaBakshoCompanion` rebuilt at the
+  new path.
+
+---
+
 ## 2026-10-04 — PC companion: default media folder, and it never creates one
 
 - **Changed** `gui.DEFAULT_FOLDER` from `~/BokaBaksho` to
@@ -108,7 +149,7 @@ Newest entries first. All dates are the date the change was made.
 
 ## 2026-10-03 — Documentation overhaul and project rename
 
-- **Project renamed from *BoomBox2* to *Boka_Baksho*.** All documentation now
+- **Project renamed from *BoomBox2* to *BokaBaksho*.** All documentation now
   uses the new name. The BLE advertised device name was already `BokaBaksho`
   and is unchanged; the stale `// BoomBox2 lyric synchronization system`
   comment in `src/services/ble_service.h` was corrected.
@@ -142,7 +183,7 @@ Newest entries first. All dates are the date the change was made.
   auto-return from `LoadFailed`, the stale `song_request_start_` timeout, the
   `total_songs_ == 0` modulo-by-zero path, dead `kLyricsPathA/B` constants,
   the double `setMinPreferred()` call, and the non-existent test suite.
-- **`test/README.md`** renamed the project to *Boka_Baksho* and now states
+- **`test/README.md`** renamed the project to *BokaBaksho* and now states
   plainly that no test files and no `native` environment exist.
 - **Verified:** `pio run` succeeds — RAM 23.9%, Flash 38.7%.
 

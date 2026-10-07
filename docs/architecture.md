@@ -1,8 +1,8 @@
-# Boka_Baksho Architecture
+# BokaBaksho Architecture
 
 ## 1. Overview
 
-Boka_Baksho is a layered, event-driven firmware framework for a portable ESP32
+BokaBaksho is a layered, event-driven firmware framework for a portable ESP32
 device. It provides a scrollable app launcher, a uniform application lifecycle,
 exclusive display ownership, and a clean separation between hardware drivers,
 system services, and user-facing applications.

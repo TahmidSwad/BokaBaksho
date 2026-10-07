@@ -1,6 +1,6 @@
 # Current State
 
-Status of the Boka_Baksho firmware as of **2026-10-03**, verified against the
+Status of the BokaBaksho firmware as of **2026-10-03**, verified against the
 source tree and a successful `pio run`.
 
 ---

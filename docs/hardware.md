@@ -1,6 +1,6 @@
 # Hardware
 
-Boka_Baksho targets an ESP32 DevKit v1 with a 128×64 SSD1306 OLED, four
+BokaBaksho targets an ESP32 DevKit v1 with a 128×64 SSD1306 OLED, four
 momentary buttons, and a BLE radio. This document is the authoritative pin and
 peripheral reference.
 

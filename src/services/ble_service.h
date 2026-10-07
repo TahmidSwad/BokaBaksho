@@ -14,7 +14,7 @@
 // BLE SERVICE
 // ==========================================================
 // A BLE GATT-based command/response protocol for the
-// Boka_Baksho lyric synchronization system.
+// BokaBaksho lyric synchronization system.
 //
 // GATT layout:
 //   Service   UUID: 12345678-1234-5678-9abc-def012345678

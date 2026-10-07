@@ -1,6 +1,6 @@
 # API Reference
 
-Complete reference for every module in Boka_Baksho: classes, methods, globals,
+Complete reference for every module in BokaBaksho: classes, methods, globals,
 and shared types. Companion documents: [architecture.md](architecture.md) for
 how the pieces fit together, [conventions.md](conventions.md) for the rules that
 govern them.

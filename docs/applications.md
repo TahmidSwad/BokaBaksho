@@ -1,6 +1,6 @@
 # Applications
 
-This document specifies the behaviour of every application in Boka_Baksho:
+This document specifies the behaviour of every application in BokaBaksho:
 what it shows, how it reacts to input, and how it moves between states.
 
 For the lifecycle contract that all apps share, see

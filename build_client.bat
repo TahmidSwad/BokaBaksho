@@ -1,5 +1,5 @@
 @echo off
-rem Build the Boka_Baksho PC companion into a standalone executable.
+rem Build the BokaBaksho PC companion into a standalone executable.
 rem
 rem   build_client.bat
 rem

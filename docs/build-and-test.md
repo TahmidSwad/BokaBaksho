@@ -1,6 +1,6 @@
 # Build & Test
 
-Everything needed to compile, flash, monitor, and test Boka_Baksho, plus how
+Everything needed to compile, flash, monitor, and test BokaBaksho, plus how
 to run and package the PC companion.
 
 ---
@@ -202,9 +202,14 @@ device cannot work without it.
 
 ```sh
 python3 -m venv .venv                 # once
-.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m pip install -r requirements.txt
 .venv/bin/python -m pc_client         # equivalent: python run_companion.py
 ```
+
+> pip is invoked as `python -m pip` rather than `.venv/bin/pip`: the `pip`
+> launcher embeds an absolute shebang, so it breaks if the project directory
+> is ever moved or renamed. `python -m pip` resolves pip from the
+> environment's `site-packages` and needs no absolute path.
 
 `tkinter` is part of CPython but packaged separately by most distributions:
 

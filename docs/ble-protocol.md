@@ -1,6 +1,6 @@
 # BLE Protocol
 
-Boka_Baksho exposes a GATT server that a PC companion uses to supply the song
+BokaBaksho exposes a GATT server that a PC companion uses to supply the song
 library and lyrics, and to control audio playback. The device never plays audio
 itself.
 

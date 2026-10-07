@@ -1,4 +1,4 @@
-"""Minimal Tk front end for the Boka_Baksho companion.
+"""Minimal Tk front end for the BokaBaksho companion.
 
 Everything the user can do here is something the firmware cannot do on its
 own: pick the media folder, open the BLE link, and watch what happened.

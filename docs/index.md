@@ -1,6 +1,6 @@
-# Boka_Baksho Documentation
+# BokaBaksho Documentation
 
-This directory contains the complete documentation for the Boka_Baksho
+This directory contains the complete documentation for the BokaBaksho
 firmware. Start with the architecture document if you are new to the project;
 use the API reference and conventions documents when writing code.
 
@@ -38,8 +38,8 @@ use the API reference and conventions documents when writing code.
 
 ## Conventions Used in These Documents
 
-- **Boka_Baksho** is the project name; **`BokaBaksho`** (no underscore) is the
-  BLE advertised device name, spelled exactly as it appears in
+- The project, the repository, and the BLE advertised device name are all
+  spelled **BokaBaksho** — no space, no underscore. The BLE name is defined in
   `src/services/ble_service.h`.
 - Code identifiers are rendered in `monospace`: `AppManager`, `AppId::Lyrics`,
   `DisplayRequestType::ShowSongList`.

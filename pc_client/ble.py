@@ -1,4 +1,4 @@
-"""BLE link between the PC and the Boka_Baksho ESP32.
+"""BLE link between the PC and the BokaBaksho ESP32.
 
 Threading model (unchanged in spirit from the original reference client):
 

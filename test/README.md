@@ -1,4 +1,4 @@
-Boka_Baksho Test Suite
+BokaBaksho Test Suite
 ======================
 
 Status: **placeholder — no tests exist yet.**

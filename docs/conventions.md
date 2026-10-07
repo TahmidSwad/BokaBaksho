@@ -1,7 +1,7 @@
 # Conventions & Extension Guide
 
 Coding standards, hard constraints, and step-by-step instructions for adding
-new components to Boka_Baksho.
+new components to BokaBaksho.
 
 ---
 

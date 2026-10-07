@@ -1,15 +1,16 @@
-# Boka_Baksho
+# BokaBaksho
 
 A lightweight, OS-style multi-application firmware for a portable ESP32 device,
 built around a 128×64 SSD1306 OLED and four physical buttons.
 
-Boka_Baksho provides a scrollable app launcher, an event-driven core with an
+BokaBaksho provides a scrollable app launcher, an event-driven core with an
 explicit application lifecycle, a foreground-exclusive display model, and a BLE
 bridge to a companion PC that performs audio playback. The device currently
 ships with a karaoke **Lyrics** app and a **Timer/Stopwatch** app.
 
-> The project was previously named *BoomBox2*. All documentation now uses
-> **Boka_Baksho**. The BLE advertised device name is `BokaBaksho`.
+> The project has been renamed twice: *BoomBox2* → *Boka_Baksho* →
+> **BokaBaksho** (2026-10-08). The BLE advertised device name has always been
+> `BokaBaksho` and is unchanged.
 
 ---
 
@@ -104,7 +105,7 @@ Serial debug input works with no hardware attached (`pio device monitor`,
 ## Project Layout
 
 ```
-Boka_Baksho/
+BokaBaksho/
 ├── README.md                 this file
 ├── platformio.ini            board, filesystem, dependencies, build flags
 ├── docs/                     full documentation set (see docs/index.md)
@@ -194,7 +195,7 @@ use **Browse…** to point at a different one.
 
 ```sh
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m pip install -r requirements.txt
 .venv/bin/python -m pc_client          # or: python run_companion.py
 ```
 

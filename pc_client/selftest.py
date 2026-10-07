@@ -285,7 +285,7 @@ def make_tmp_media():
 
 
 def main():
-    print("Boka_Baksho companion self-test")
+    print("BokaBaksho companion self-test")
     print(MEDIA_HINT)
 
     media = make_tmp_media()
