@@ -324,7 +324,13 @@ Renderers (all private, all take `const DisplayRequest&`):
 `ShowBigTime`, `ShowScreensaver`, `ClearDisplay`.
 
 Helpers: `SetFont(TextSize)`, `CalculateX(text, align)`,
-`CalculateCenteredY()`.
+`CalculateCenteredY()`, `TryDrawWrapped(text, max_width)`,
+`DrawCentered(text)`, `Shrink(TextSize)`.
+
+`ShowWord` uses `TryDrawWrapped`, which draws one line if the text fits,
+otherwise two balanced lines, and reports failure when even two will not fit
+so the caller can step the font down. `kMaxWrapLen` (64) is the longest
+string it will split.
 
 Layout details for each renderer are in
 [applications.md §5](applications.md#5-screen-layouts).

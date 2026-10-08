@@ -478,7 +478,10 @@ bool LyricsApp::ShowCurrentWord() {
   event.sender = GetAppId();
   event.display_request.type = DisplayRequestType::ShowWord;
   event.display_request.text = word;
-  event.display_request.text_size = (strlen(word) > 8) ? TextSize::Medium : TextSize::Large;
+  // Always Large. DisplayService::ShowWord() wraps text that will not fit
+  // onto a second line, so the old "shrink past 8 characters" rule only
+  // cost readability.
+  event.display_request.text_size = TextSize::Large;
   event.display_request.alignment = TextAlign::Center;
   display_active_ = true;
   return (bool)event_bus.Post(event);

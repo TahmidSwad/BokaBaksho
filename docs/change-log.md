@@ -34,6 +34,42 @@ Two small firmware defects from
 
 ---
 
+## 2026-10-08 — Wrap long lyric words onto two lines instead of shrinking them
+
+`ShowCurrentWord()` dropped from `Large` to `Medium` as soon as a word
+exceeded 8 characters, so ordinary words like "Yesterday" or "Wonderful"
+rendered small even though they would have fit the 128 px width comfortably
+at full size.
+
+- **The renderer now decides, not the app.** `LyricsApp` always requests
+  `Large`; `DisplayService::ShowWord()` measures with `GetTextWidth()` and
+  draws one line whenever the text fits.
+- **Too wide for one line? Two lines at the same size.** The split sits as
+  close to the midpoint as both halves' width limits allow, so a 13-character
+  word reads as `Unforg | ettable` rather than `Unforgettab | le`. The pair
+  is centred as a block, using the same baseline arithmetic `ShowLines` uses.
+- **Shrinking is now the last resort**, applied only when two lines will not
+  hold the text: `Large` → `Medium` → `Small`, re-tested at each size, then a
+  final draw at `Small` that lets the edges clip. For a lyric word (31
+  characters maximum) the ladder always succeeds at `Medium`.
+- The split is measured against a NUL-terminated **copy** — the caller's
+  string is usually a string literal and is never mutated. Text of
+  `kMaxWrapLen` (64) bytes or more is never wrapped, only shrunk.
+- Wrapping applies to every `ShowWord` caller, which here also means
+  `LyricsApp::ShowStatus()`. Existing status strings all fit on one line at
+  `Medium`, so nothing else changed.
+- **Verified:** `pio run` SUCCESS — RAM 23.9% (78,440), Flash 38.7%
+  (1,217,129), **+528 bytes**. The split algorithm was exercised on the host
+  against every word length 1–31 at all three font widths: each case yields
+  two non-empty lines that both fit, and is balanced whenever the midpoint
+  itself fits. **Not yet flashed** — the rendered result has not been seen on
+  the device.
+- **Docs:** `applications.md` §3.6, §5.4; `hardware.md` §4;
+  `architecture.md` §6; `api-reference.md` §4.1; `current-state.md` §1.3,
+  §1.7.
+
+---
+
 ## 2026-10-08 — LyricsApp: five correctness fixes
 
 Five defects fixed together: four from

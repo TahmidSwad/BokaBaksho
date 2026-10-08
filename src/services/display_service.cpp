@@ -60,17 +60,101 @@ void DisplayService::OnEvent(const Event& event) {
 // ==========================================================
 // SHOW WORD
 // ==========================================================
+// Text too wide for one line is wrapped onto two lines at the same font
+// rather than shrunk: on a 64 px screen two full-height lines read better
+// than one small one. The caller's size is only reduced as a last resort,
+// when even two lines will not hold the text.
 
 void DisplayService::ShowWord(const DisplayRequest& req) {
   if (req.text == nullptr) return;
   oled.Clear();
-  SetFont(req.text_size);
-  int16_t text_width = oled.GetTextWidth(req.text);
-  int16_t text_height = oled.GetTextHeight();
-  int16_t x = (oled.Width() - text_width) / 2;
-  int16_t y = (oled.Height() + text_height) / 2;
-  oled.DrawText(x, y, req.text);
+
+  const int16_t max_width = (int16_t)oled.Width();
+  TextSize size = req.text_size;
+  for (uint8_t attempt = 0; attempt < 3; ++attempt) {
+    SetFont(size);
+    if (TryDrawWrapped(req.text, max_width)) {
+      oled.Update();
+      return;
+    }
+    const TextSize next = Shrink(size);
+    if (next == size) break;  // already at the smallest font
+    size = next;
+  }
+
+  // Nothing fits: draw anyway at the smallest size and let it clip.
+  SetFont(TextSize::Small);
+  DrawCentered(req.text);
   oled.Update();
+}
+
+// Lays text out centred at the current font and draws it. Returns false
+// without drawing when it will not fit on one or two lines, so the caller
+// can retry at a smaller size.
+bool DisplayService::TryDrawWrapped(const char* text, int16_t max_width) {
+  if (oled.GetTextWidth(text) <= max_width) {
+    DrawCentered(text);
+    return true;
+  }
+
+  // Too wide for one line. The split point is found by NUL-terminating a
+  // copy, since the caller's text may well be a string literal.
+  const size_t len = strlen(text);
+  if (len < 2 || len >= kMaxWrapLen) return false;
+
+  char head[kMaxWrapLen];
+  memcpy(head, text, len);
+  head[len] = '\0';
+
+  // Widest line 1 that still fits.
+  uint8_t hi = 0;
+  for (size_t i = len; i > 0; --i) {
+    const char saved = head[i];
+    head[i] = '\0';
+    if (oled.GetTextWidth(head) <= max_width) {
+      hi = (uint8_t)i;
+      break;
+    }
+    head[i] = saved;
+  }
+  if (hi < 2) return false;
+
+  // Narrowest line 1 whose remainder still fits.
+  uint8_t lo = (uint8_t)len;
+  for (size_t i = 1; i <= len; ++i) {
+    if (oled.GetTextWidth(text + i) <= max_width) {
+      lo = (uint8_t)i;
+      break;
+    }
+  }
+  if (lo > hi) return false;  // needs three lines at this size
+
+  // Balanced: keep the two lines as even as both limits allow.
+  uint8_t split = (uint8_t)(len / 2);
+  if (split < lo) split = lo;
+  if (split > hi) split = hi;
+  head[split] = '\0';
+
+  const int16_t line_height = oled.GetTextHeight();
+  const int16_t start_y = (oled.Height() - 2 * line_height) / 2 + line_height;
+  oled.DrawText((oled.Width() - oled.GetTextWidth(head)) / 2, start_y, head);
+  oled.DrawText((oled.Width() - oled.GetTextWidth(text + split)) / 2,
+                start_y + line_height, text + split);
+  return true;
+}
+
+void DisplayService::DrawCentered(const char* text) {
+  oled.DrawText((oled.Width() - oled.GetTextWidth(text)) / 2,
+                (oled.Height() + oled.GetTextHeight()) / 2, text);
+}
+
+TextSize DisplayService::Shrink(TextSize size) {
+  switch (size) {
+    case TextSize::Large:  return TextSize::Medium;
+    case TextSize::Medium: return TextSize::Small;
+    case TextSize::Small:  return TextSize::Small;
+  }
+  return TextSize::Small;
 }
 
 // ==========================================================

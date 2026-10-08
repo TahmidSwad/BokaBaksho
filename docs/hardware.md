@@ -91,7 +91,7 @@ Coordinates are the U8g2 defaults: origin at the top-left, x grows right
 |---|---|---|---|
 | `Small` | `u8g2_font_courR08_tr` | ~8 px | Status lines, scroll arrows, `n / total` counters |
 | `Medium` | `u8g2_font_courR10_tr` | ~10 px | Song lists, status messages, `ShowBigTime` top label |
-| `Large` | `u8g2_font_courR18_tr` | ~18 px | Launcher app name, lyric words ≤ 8 characters |
+| `Large` | `u8g2_font_courR18_tr` | ~18 px | Launcher app name, lyric words (wrapped to two lines when too wide) |
 | `LargeBold` | `u8g2_font_bubble_tn` | large | The big centred time in the Timer app |
 
 Metrics are queried at runtime through `Oled::GetTextWidth()`,

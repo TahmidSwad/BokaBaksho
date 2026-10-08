@@ -257,8 +257,9 @@ duration.
 
 `UpdateCurrentWord(elapsed)` advances `current_word_` while the **next**
 word's timestamp is already due, marking `new_word_`. It also re-arms a word
-that has not been shown yet. `ShowCurrentWord()` renders with `Large` font for
-words of ≤ 8 characters and `Medium` for longer ones.
+that has not been shown yet. `ShowCurrentWord()` always requests `Large`;
+it is the renderer, not the app, that decides whether the word needs a
+second line (§5.4).
 
 Words longer than `kMaxWordLength - 1` (31) characters are truncated during
 parsing; the parser stops after `kMaxWords` (1000).
@@ -419,6 +420,19 @@ alignment with no indent.
 `ShowWord` centres the text both horizontally and vertically, ignoring
 `alignment` for horizontal placement. `ShowLine` centres vertically but honours
 `alignment` horizontally.
+
+**Wrapping.** `ShowWord` measures the text with `GetTextWidth()` at the
+requested `text_size` and draws one line if it fits the 128 px width. If it
+does not, it splits across **two lines at the same size**, choosing the split
+as evenly as both lines' width limits allow, rather than dropping to a smaller
+font — two full-height lines read better than one small one. Only when even
+two lines will not hold the text does it step down (`Large` → `Medium` →
+`Small`), re-testing at each size; if nothing fits it draws at `Small` and
+lets the edges clip.
+
+The split is found by NUL-terminating a private copy, so the caller's string —
+usually a string literal — is never modified. Text of `kMaxWrapLen` (64)
+bytes or more is never wrapped, only shrunk.
 
 ### 5.5 `ShowBigTime`
 

@@ -35,6 +35,17 @@ private:
   int16_t CalculateX(const char* text, TextAlign align);
   int16_t CalculateCenteredY();
 
+  // Word layout: one line if it fits, otherwise two balanced lines.
+  // Returns false without drawing when neither fits at the current font.
+  bool TryDrawWrapped(const char* text, int16_t max_width);
+  void DrawCentered(const char* text);
+  static TextSize Shrink(TextSize size);
+
+  // Longest string ShowWord() will split across two lines. It has to hold
+  // the whole text plus a terminator, because the split is measured by
+  // NUL-terminating a copy rather than mutating the caller's string.
+  static constexpr uint8_t kMaxWrapLen = 64;
+
   // Internal flag to indicate that the OLED driver is ready.
   bool initialized_ = false;
 };

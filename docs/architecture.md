@@ -296,7 +296,7 @@ lives in `common/ui_types.h` and the payload in `common/event_types.h`.
 
 | `DisplayRequestType` | Payload used | Rendered by |
 |---|---|---|
-| `ShowWord` | `text`, `text_size`, `alignment` | Centred single word/phrase, screen cleared first |
+| `ShowWord` | `text`, `text_size`, `alignment` | Centred word/phrase, screen cleared first; wraps to two lines at the same size when it exceeds the width, shrinking only as a last resort |
 | `ShowLine` | `text`, `text_size`, `alignment` | Centred single line (vertical centring) |
 | `ShowLines` | `lines[]`, `line_count`, `selected` | Vertically centred block; `>` cursor at x=0 with 10 px indent when `selected < line_count` |
 | `ShowSongList` | `lines[]`, `line_count`, `selected`, `total_count`, `has_more_above/below` | Top-anchored list with `>` cursor, `^`/`v` scroll arrows, and an `n / total` counter in the bottom-right |

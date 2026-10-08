@@ -29,7 +29,9 @@ source tree and a successful `pio run`.
 ### 1.3 Services
 
 - **`DisplayService`** — renders all eight `DisplayRequestType` variants and
-  enforces foreground-only ownership.
+  enforces foreground-only ownership. `ShowWord` wraps text too wide for one
+  line onto two lines at the same font, stepping the size down only when two
+  lines are not enough.
 - **`InputService`** — polls four buttons and the serial console, posts
   normalized `InputEvent`s with `sender = AppId::Count`.
 - **`StorageService`** — LittleFS wrapper (`Begin`, `Exists`, `Open`, `Remove`,
@@ -89,7 +91,7 @@ source tree and a successful `pio run`.
 - PlatformIO environment `esp32doit-devkit-v1`, LittleFS, `huge_app.csv`,
   `-Isrc`, U8g2 dependency.
 - **Verified 2026-10-08:** builds successfully — RAM 23.9% (78,440 / 327,680),
-  Flash 38.7% (1,216,601 / 3,145,728).
+  Flash 38.7% (1,217,129 / 3,145,728).
 
 ### 1.8 PC companion (`pc_client/`)
 
