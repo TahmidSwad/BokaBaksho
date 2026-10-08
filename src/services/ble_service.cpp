@@ -67,8 +67,13 @@ bool BleService::Begin() {
   BLEAdvertising* advertising = BLEDevice::getAdvertising();
   advertising->addServiceUUID(BLE_SERVICE_UUID);
   advertising->setScanResponse(true);
+  // Advertise a preferred connection interval range (slave connection
+  // interval AD field, units of 1.25 ms): 0x06 = 7.5 ms, 0x12 = 22.5 ms.
+  // These are separate fields — setMinPreferred() only writes min_interval,
+  // so calling it twice would discard the 0x06 minimum and leave the maximum
+  // at the BLEAdvertising() default of 0x40 (80 ms).
   advertising->setMinPreferred(0x06);  // connection interval min
-  advertising->setMinPreferred(0x12);  // connection interval max
+  advertising->setMaxPreferred(0x12);  // connection interval max
 
   BLEDevice::startAdvertising();
 

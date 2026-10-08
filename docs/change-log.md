@@ -4,6 +4,95 @@ Newest entries first. All dates are the date the change was made.
 
 ---
 
+## 2026-10-08 — BLE connection interval + stale input comments
+
+Two small firmware defects from
+[current-state.md §3.2](current-state.md#32-code-level).
+
+- **Connection interval (roadmap 1.6).** `BleService::Begin()` called
+  `setMinPreferred(0x06)` and then `setMinPreferred(0x12)`, with comments
+  labelling them "min" and "max". Both write the *same* field —
+  `esp_ble_adv_data_t::min_interval` — so the second overwrote the first and
+  `max_interval` was never touched, staying at the `BLEAdvertising()`
+  constructor default of `0x40`. The device was advertising a preferred slave
+  connection interval range of **22.5 … 80 ms** instead of the intended
+  **7.5 … 22.5 ms** (units of 1.25 ms). Line 71 now calls
+  `setMaxPreferred(0x12)`. Both fields reach the air because
+  `BLEAdvertising::start()` passes `&m_advData` to
+  `esp_ble_gap_config_adv_data()`.
+- **Stale input comments (roadmap 1.5).** `config.h` and `input_service.h`
+  claimed "Increment button → RotateRight". `InputService::Poll()` posts
+  `ButtonIncrement` / `ButtonDecrement`; `RotateLeft` / `RotateRight` come only
+  from `PollSerialDebug()`'s serial `l` / `r` keys. Both comments now name the
+  `InputType` each pin produces.
+- **Verified:** `pio run` SUCCESS — RAM 23.9% (78,440), Flash 38.7%
+  (1,216,545), **+16 bytes**. **Not yet flashed** — no on-device retest, and
+  the connection-interval effect cannot be confirmed without a sniffer or a
+  host that reports the negotiated interval.
+- **Docs:** `hardware.md` §5, §6; `ble-protocol.md` §1, §6;
+  `current-state.md` §1.7, §3.2; `roadmap.md` 1.5, 1.6.
+
+---
+
+## 2026-10-08 — LyricsApp: five correctness fixes
+
+Five defects fixed together: four from
+[current-state.md §3.1](current-state.md#31-behavioural), plus one found while
+fixing them (roadmap 1.9). The scroll and auto-advance defects only bite once
+the library exceeds 5 songs; the auto-return bites on any failed request.
+
+- **The song-list window now scrolls (roadmap 1.8).** `buffer_offset_` was
+  written exactly once (`= 0`) and never again, so buffer and offset disagreed
+  as soon as the window moved: past the 5th song the cursor disappeared,
+  `ENTER` did nothing, and the `^` arrow could never appear. `RequestSongs()`
+  records the offset it asked for in a new `requested_offset_` member, and
+  `OnSongListReceived()` copies it into `buffer_offset_` **when the reply
+  arrives** — committing them together means a timed-out request can never
+  claim an offset its stale buffer does not have.
+- **`LoadFailed` auto-returns (roadmap 1.1).** `load_failed_start_` was stamped
+  at all six transitions into `LoadFailed` but never read, so an error screen
+  was permanent while `Enter` and the navigation buttons were swallowed —
+  `BACK` was the only exit. `Update()` now reads it and calls
+  `ReturnToFileList()` after `kLoadFailedTimeoutMs` (1500 ms), a constant
+  documented since 2026-09-15 that had never actually existed.
+  `EnterWaitingSongs()` also clears `song_request_start_`, otherwise a fresh
+  wait inherited the previous request's deadline, re-entered `LoadFailed`
+  immediately, and turned the auto-return into a flicker loop.
+- **No more modulo by zero (roadmap 1.3).** `OnSongListReceived()` corrected
+  `total_songs_` only when a reply held fewer than 5 names, so a client sending
+  exactly 5 names without `TOTAL_SONGS|` left it at 0 — making
+  `total_songs_ - 1` underflow to 255 while scrolling and making auto-advance
+  compute `% 0` (undefined behaviour). It now falls back to
+  `buffer_offset_ + added`, a lower bound the window actually proves, and
+  auto-advance additionally refuses `total_songs_ == 0` and returns to the list.
+- **Auto-advance waits for its window (roadmap 1.9).** When the next song fell
+  outside the 5-row window the old code fired `REQUEST_SONGS` and then called
+  `LoadSelectedLyric()` *immediately*, which indexed past `buffer_count_` and
+  returned without doing anything — leaving `Playing` with `playing_ == false`,
+  so `Update()` hit `if (!playing_) return;` forever while the arriving `SONGS`
+  reply was ignored. Playback therefore stopped silently at the window
+  boundary. A new `pending_load_` flag defers the load to
+  `OnSongListReceived()`, falling back to `ReturnToFileList()` if the fresh
+  window still misses the target; `EnterWaitingSongs()` and `EnterFileList()`
+  clear it so an abandoned request can never start a song when a late reply
+  lands.
+- **A late reply recovers from `LoadFailed` (roadmap 1.4).** The song-list
+  timeout is the only transition into `LoadFailed` guarded by
+  `waiting_for_songs_`, so `OnSongListReceived()` now captures that flag before
+  clearing it; when it is still set, the reply calls `EnterFileList()`
+  immediately. Previously the reply was dropped and the "No device" screen held
+  for the rest of `kLoadFailedTimeoutMs` — about a device that had just spoken
+  — discarding a round trip already paid for. Lyric data and `AUDIO_STARTED`
+  arriving late are still ignored, deliberately.
+- **Verified:** `pio run` SUCCESS — RAM 23.9% (78,440), Flash 38.7%
+  (1,216,601), **+352 bytes**. **Not yet flashed** — there has been no
+  on-device retest.
+- **Docs:** `current-state.md` §1.5, §1.7, §3.1, §3.3, §4; `roadmap.md`
+  1.1/1.3/1.4/1.8/1.9; `applications.md` §3.2–§3.8; `api-reference.md` §5.2;
+  `ble-protocol.md` §4.3; `decisions.md` D14.
+
+---
+
 ## 2026-10-08 — Project renamed from *Boka_Baksho* to *BokaBaksho*
 
 - **Renamed the project** so that the project, the repository, the local
@@ -135,7 +224,8 @@ Newest entries first. All dates are the date the change was made.
   assigned exactly once and never updated to the requested offset, so the
   song-list window cannot scroll past its first 5 entries — the cursor
   disappears and `ENTER` does nothing. It cannot be worked around from the PC
-  side. **Not fixed** — firmware defects remain deferred.
+  side. **Not fixed** — firmware defects remain deferred. *(Fixed
+  2026-10-08 — see the entry at the top of this file.)*
 - **Documentation:** new [§6 in `build-and-test.md`](build-and-test.md#6-pc-companion-client)
   (run, build, self-test, dependencies, what is *not* verified),
   [§5.2 in `ble-protocol.md`](ble-protocol.md#52-reference-implementation-pc_client)
@@ -191,10 +281,11 @@ Newest entries first. All dates are the date the change was made.
 
 ## 2026-09-15 — Lyrics UI: selection indicator + non-blocking error states
 
-> **Superseded in part.** The 1500 ms auto-return described below is **not**
-> present in the code as of 2026-10-03 — `LyricsApp`'s `LoadFailed` state has
-> no timer and waits for `BACK`. See
-> [current-state.md §3.1](current-state.md#31-behavioural). The entry is kept
+> **Superseded in part, then reinstated.** The 1500 ms auto-return described
+> below was **absent** from the code from 2026-09-16 until 2026-10-08 —
+> `LyricsApp`'s `LoadFailed` state had no timer and waited for `BACK`. The
+> constant `kLoadFailedTimeoutMs = 1500` and the auto-return were restored on
+> 2026-10-08 (roadmap 1.1), so the claim below is true again. The entry is kept
 > as a record of the change as made.
 
 - **`DisplayService::ShowLines`** now renders a `>` cursor before the selected

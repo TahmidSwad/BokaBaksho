@@ -21,7 +21,7 @@ Implemented in `src/services/ble_service.h` / `.cpp`; dispatched in
 | RX properties | **WRITE** (PC → ESP32) |
 | Requested MTU | 517 |
 | Scan response | enabled |
-| Connection interval hints | `setMinPreferred(0x06)`, then `setMinPreferred(0x12)` |
+| Connection interval hints | `setMinPreferred(0x06)` / `setMaxPreferred(0x12)` (7.5 ms … 22.5 ms) |
 | Advertising | started in `Begin()`; restarted automatically in `onDisconnect` |
 | Client limit | one at a time |
 
@@ -160,12 +160,17 @@ PC                                ESP32
 | Song list reply | 5 s (`kSongRequestTimeoutMs`) measured from when `REQUEST_SONGS` was transmitted | `LoadFailed`, screen shows `No device` |
 | Lyric reply | 5 s (`kSongRequestTimeoutMs`) measured from when `LYRICS\|` was transmitted — i.e. from `ENTER` | `LoadFailed`, screen shows `No device` |
 | `AUDIO_STARTED` after `PLAY` | 10 s (`kHandshakeTimeoutMs`) | `LoadFailed`, screen shows `No device` / `connected` |
+| `LoadFailed` on screen | 1.5 s (`kLoadFailedTimeoutMs`) | `ReturnToFileList()` — the error screen clears itself without user input |
 
 Both 5 s windows share the same `LyricsApp::song_request_start_` member;
 `LoadSelectedLyric()` re-arms it when it sends `LYRICS|`. Before 2026-10-03 it
 was not re-armed, so the lyric timeout was effectively measured from the
 song-list request and any list displayed for more than 5 s failed instantly on
 `ENTER`.
+
+A `SONGS` reply landing during `LoadFailed` clears the screen immediately
+instead of waiting out the 1.5 s — so a reply that arrives *after* the 5 s
+deadline is still used rather than treated as a failed exchange.
 
 A `Back` press during `Loading` or `WaitingHandshake` aborts immediately.
 
@@ -261,5 +266,3 @@ client. See [build-and-test.md §6](build-and-test.md#6-pc-companion-client).
   the event system — apps call `ble_service.SendCommand()` directly.
 - **`BleService::Stop()` is never called**, so advertising runs for the whole
   session.
-- The connection-interval configuration calls `setMinPreferred()` twice
-  (see [current-state.md](current-state.md#3-known-issues--limitations)).

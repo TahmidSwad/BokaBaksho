@@ -185,7 +185,7 @@ playback on request.
 | `WaitingHandshake` | `Loading...` | `Update()` once lyrics are complete |
 | `Playing` | song title, then lyrics | `Update()` on `AUDIO_STARTED` |
 | `Paused` | `PAUSED` | ENTER while playing |
-| `LoadFailed` | error message | several failure paths |
+| `LoadFailed` | error message | several failure paths; leaves itself after 1.5 s |
 
 ### 3.3 Input by state
 
@@ -202,6 +202,11 @@ playback on request.
 Returning `false` for a non-`Back` event makes `AppManager::RouteInput()`
 return `false`, which simply drops the event.
 
+In `LoadFailed`, `Enter` and the navigation buttons are deliberately consumed,
+so `BACK` is the only *user* exit; `Update()` additionally calls
+`ReturnToFileList()` after `kLoadFailedTimeoutMs`, so the screen can never
+strand the user.
+
 ### 3.4 Scroll window
 
 The app keeps a 5-row window (`kWindowSize`) of song names in
@@ -211,13 +216,27 @@ The app keeps a 5-row window (`kWindowSize`) of song names in
   triggers `RequestSongs(offset)` with
   `offset = selected_index_ < 2 ? 0 : selected_index_ - 2`, centring the
   selection in the new window.
+- `RequestSongs()` records that offset in `requested_offset_`;
+  `OnSongListReceived()` copies it into `buffer_offset_` **when the reply
+  arrives**. They are committed together, so buffer and offset always describe
+  the same window and a timed-out request never claims an offset its stale
+  buffer does not have.
 - `ShowFileList()` publishes `has_more_above = buffer_offset_ > 0` and
   `has_more_below = buffer_offset_ + buffer_count_ < total_songs_`, which the
   renderer turns into `^` / `v` arrows.
 - `selected` is passed as `selected_index_ - buffer_offset_`, i.e. a
   **window-relative** index.
-- A short reply may shrink `total_songs_` to `buffer_offset_ + added` when the
-  PC reports fewer songs than claimed.
+- A reply shorter than the window shrinks `total_songs_` to
+  `buffer_offset_ + added`. When no `TOTAL_SONGS|` has ever arrived,
+  `total_songs_` is initialised to that same `buffer_offset_ + added` — a lower
+  bound — instead of being left at 0, which would underflow
+  `total_songs_ - 1` to 255 while scrolling.
+- A reply that lands **after** the song-list request already timed out still
+  shows the list: `OnSongListReceived()` captures `waiting_for_songs_` before
+  clearing it, and that flag is the guard on the song-list timeout, so
+  `LoadFailed` together with a captured flag identifies exactly this case.
+  Without it the reply would be dropped and the "No device" screen held out to
+  its 1.5 s, discarding a round trip already paid for.
 
 ### 3.5 Timing
 
@@ -226,6 +245,7 @@ The app keeps a 5-row window (`kWindowSize`) of song names in
 | Song list reply | `kSongRequestTimeoutMs` = 5 s from the `REQUEST_SONGS` transmission | `LoadFailed` with `No device` |
 | Lyric reply | `kSongRequestTimeoutMs` = 5 s from the `LYRICS\|` transmission (re-armed by `ENTER`) | `LoadFailed` with `No device` |
 | Post-`PLAY` handshake | `kHandshakeTimeoutMs` = 10 s | `LoadFailed` with the two-line `No device / connected` screen |
+| Any `LoadFailed` state | `kLoadFailedTimeoutMs` = 1.5 s from the transition | auto-returns to the song list (`BACK` leaves immediately) |
 | Song title before lyrics | `kTitleTimeoutMs` = 1.5 s | `Update()` returns early until `title_until_` passes |
 | Word visibility | `kWordDisplayTimeoutMs` = 5 s | screen blanks if no new word arrives |
 
@@ -245,10 +265,26 @@ parsing; the parser stops after `kMaxWords` (1000).
 
 ### 3.7 Playlist auto-advance
 
-When the PC sends `END` while `Playing`, the app stops playback, moves
-`selected_index_` to `(selected_index_ + 1) % total_songs_`, refetches the
-window if the new selection is outside it, and immediately starts loading the
-next song.
+When the PC sends `END` while `Playing`, the app stops playback and moves
+`selected_index_` to `(selected_index_ + 1) % total_songs_`.
+
+- If the new selection is **inside** the current window, the next song starts
+  loading immediately.
+- If it is **outside**, a new window must be fetched first: the app sends
+  `REQUEST_SONGS`, sets `pending_load_` and waits. When the reply lands,
+  `OnSongListReceived()` loads the song from the fresh window. Loading early
+  would index past `buffer_count_` and silently do nothing — leaving the app in
+  `Playing` with `playing_ == false` forever, because a `SONGS` reply never
+  triggered a load. Should the fresh window *still* miss the target (an empty
+  reply, say), the app falls back with `ReturnToFileList()` instead of hanging.
+
+`pending_load_` is cleared by `EnterWaitingSongs()` and `EnterFileList()`, so
+an abandoned request — timeout, `BACK`, disconnect — can never start a song
+unexpectedly when a late reply finally arrives.
+
+If `total_songs_ == 0` there is no next index to compute and `% 0` is
+undefined behaviour, so the advance is skipped: the app calls
+`ReturnToFileList()`, which re-requests the library and recomputes the total.
 
 ### 3.8 Failure screens
 
@@ -259,8 +295,15 @@ next song.
 | `LYRICS_END` with zero words parsed | `No lyrics` |
 | Handshake exceeds 10 s | two lines: `No device` / `connected` (no cursor, `selected = 255`) |
 
-There is **no automatic return** from `LoadFailed` — see
-[current-state.md](current-state.md#3-known-issues--limitations).
+Every failure screen is a `LoadFailed` state that **auto-returns** to the song
+list after `kLoadFailedTimeoutMs` (1.5 s), measured from
+`load_failed_start_`. `BACK` still leaves immediately. Because
+`Enter` and the navigation buttons are consumed in `LoadFailed`, the timer is
+what guarantees the user can never be stranded.
+
+A `SONGS` reply arriving during the screen supersedes it at once instead of
+waiting out the remainder — see §3.4. That is the only reply which can do so;
+lyric data or `AUDIO_STARTED` arriving late are still ignored.
 
 ### 3.9 BLE messages sent
 

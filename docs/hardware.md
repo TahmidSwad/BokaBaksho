@@ -37,10 +37,10 @@ All four buttons share the same electrical design: one terminal to the GPIO,
 the other to GND, relying on the internal pull-up. Pressing the button reads
 `LOW`.
 
-> **Stale comments warning.** The comments in `config.h` and
-> `input_service.h` still say "Increment button → RotateRight". That mapping
-> was replaced: the hardware buttons now post `ButtonIncrement` /
-> `ButtonDecrement`. See [current-state.md](current-state.md#3-known-issues--limitations).
+The buttons post `ButtonIncrement` / `ButtonDecrement`, **not** `RotateRight` /
+`RotateLeft` — those two are produced only by the serial debug keys `l` / `r`
+in `InputService::PollSerialDebug()`. See
+[api-reference.md §4.2](api-reference.md#42-inputservice--srcservicesinput_serviceh-cpp).
 
 ---
 
@@ -145,15 +145,17 @@ at boot does not generate a phantom press.
 | CCCD | `BLE2902` descriptor added to TX so notifications can be enabled |
 | Requested MTU | 517 (BLE maximum) |
 | Scan response | enabled |
-| Preferred connection interval | `setMinPreferred(0x06)` then `setMinPreferred(0x12)` |
+| Preferred connection interval | `setMinPreferred(0x06)` / `setMaxPreferred(0x12)` → 7.5 ms … 22.5 ms |
 | Advertising | starts in `Begin()`; restarts automatically on disconnect |
 
 Serial markers: `BLE_SERVICE_INIT_OK`, `BLE_CLIENT_CONNECTED`,
 `BLE_CLIENT_DISCONNECTED`, `BLE_SERVICE_STOPPED`.
 
-Note the connection-interval calls pass the same accessor twice
-(`setMinPreferred`) for both the "min" and "max" values — see
-[current-state.md](current-state.md#3-known-issues--limitations).
+The two preferred values are the *slave connection interval range* AD field,
+in units of 1.25 ms (`0x06` = 7.5 ms, `0x12` = 22.5 ms). They are independent
+fields: until 2026-10-08 both were passed to `setMinPreferred()`, which
+overwrote the minimum and left the maximum at the `BLEAdvertising()` default of
+`0x40` (80 ms).
 
 The BLE stack runs on its own FreeRTOS task. See
 [architecture.md](architecture.md#9-concurrency-model) for how this is kept

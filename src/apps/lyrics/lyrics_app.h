@@ -49,6 +49,7 @@ private:
   static constexpr uint32_t kWordDisplayTimeoutMs = 5000;
   static constexpr uint32_t kHandshakeTimeoutMs = 10000;
   static constexpr uint32_t kSongRequestTimeoutMs = 5000;
+  static constexpr uint32_t kLoadFailedTimeoutMs = 1500;
   static constexpr uint8_t  kWindowSize = 5;
   static constexpr uint8_t  kSongNameLen = 32;
 
@@ -72,12 +73,14 @@ private:
 
   char song_buffer_[kWindowSize][kSongNameLen];
   uint8_t buffer_offset_ = 0;
+  uint8_t requested_offset_ = 0;
   uint8_t buffer_count_ = 0;
   uint8_t total_songs_ = 0;
   const char* visible_lines_[kWindowSize];
   uint8_t selected_index_ = 0;
   bool waiting_for_songs_ = false;
   bool waiting_for_lyrics_ = false;
+  bool pending_load_ = false;
 
   State state_ = State::WaitingSongs;
   bool loaded_ = false;

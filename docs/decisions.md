@@ -251,6 +251,7 @@ every call site.
 callback-driven transitions (moves state changes into the BLE task).
 
 **Consequences:** Some states are entered by direct assignment
-(`state_ = State::LoadFailed`) rather than an `Enter*()` helper, which is where
-the current `LoadFailed` no-auto-return bug lives — see
-[current-state.md §3.1](current-state.md#31-behavioural).
+(`state_ = State::LoadFailed`) rather than an `Enter*()` helper, so every such
+site is individually responsible for stamping `load_failed_start_`. `Update()`
+reads it back after `kLoadFailedTimeoutMs` and returns to the song list — this
+is what gave `LoadFailed` its auto-return (roadmap 1.1, resolved 2026-10-08).

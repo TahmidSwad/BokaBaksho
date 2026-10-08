@@ -9,14 +9,15 @@ in [current-state.md](current-state.md).
 
 | # | Item | Reference |
 |---|---|---|
-| 1.1 | Give `LoadFailed` an auto-return timer, or an explicit dismissal, so an error screen cannot strand the user | [current-state §3.1](current-state.md#31-behavioural) |
+| ~~1.1~~ | **Resolved 2026-10-08.** `Update()` now reads `load_failed_start_` (stamped at every transition into `LoadFailed`) and calls `ReturnToFileList()` after `kLoadFailedTimeoutMs` (1.5 s). `EnterWaitingSongs()` clears `song_request_start_` so a fresh wait cannot inherit a stale deadline | — |
 | ~~1.2~~ | **Resolved 2026-10-03.** `LoadSelectedLyric()` now re-arms `song_request_start_` when it sends `LYRICS\|`, so the 5 s lyrics timeout starts at `ENTER` instead of at the song-list request. The member is still shared, but every request now arms it | — |
-| 1.3 | Guard `total_songs_ == 0` before the auto-advance modulo | [current-state §3.1](current-state.md#31-behavioural) |
-| 1.4 | Make `OnSongListReceived` recover from `LoadFailed` when a late reply arrives | [current-state §3.1](current-state.md#31-behavioural) |
-| 1.5 | Fix or remove the stale "Increment → RotateRight" comments in `config.h` and `input_service.h` | [current-state §3.2](current-state.md#32-code-level) |
-| 1.6 | Fix the BLE connection-interval setup (`setMinPreferred` called twice) | [current-state §3.2](current-state.md#32-code-level) |
+| ~~1.3~~ | **Resolved 2026-10-08.** `OnSongListReceived()` falls back to `total_songs_ = buffer_offset_ + added` when no `TOTAL_SONGS\|` has been seen, so the total is never 0 while a list is shown; the auto-advance modulo additionally refuses `total_songs_ == 0` and returns to the list instead | — |
+| ~~1.4~~ | **Resolved 2026-10-08.** `OnSongListReceived()` captures `waiting_for_songs_` before clearing it — the only `LoadFailed` transition guarded by that flag is the song-list timeout — and calls `EnterFileList()` when a reply lands during `LoadFailed`. The list appears immediately instead of waiting out the 1.5 s auto-return and discarding a round trip already paid for | — |
+| ~~1.5~~ | **Resolved 2026-10-08.** `config.h` and `input_service.h` now name the `InputType` each pin actually posts, and say that `RotateLeft`/`RotateRight` are serial-debug keys only | — |
+| ~~1.6~~ | **Resolved 2026-10-08.** Line 71 now calls `setMaxPreferred(0x12)` instead of a second `setMinPreferred()`. The advertised range is the intended 7.5 ms … 22.5 ms, not 22.5 ms … 80 ms (the `BLEAdvertising()` default `max_interval = 0x40`) | — |
 | 1.7 | Decide the fate of `kLyricsPathA/B` — delete, or restore a local-lyrics mode | [current-state §2](current-state.md#2-partially-implemented--reserved) |
-| 1.8 | Record the requested offset in `buffer_offset_` — the song-list window never advances, so scrolling past the 5th song loses the cursor and ENTER does nothing | [current-state §3.1](current-state.md#31-behavioural) |
+| ~~1.8~~ | **Resolved 2026-10-08.** `RequestSongs()` records the offset it asked for in `requested_offset_`, and `OnSongListReceived()` commits it to `buffer_offset_` when (and only when) the reply arrives — so buffer and offset always describe the same window, and a timed-out request never claims an offset its stale buffer does not have | — |
+| ~~1.9~~ | **Resolved 2026-10-08.** Auto-advance no longer loads a song whose window has not arrived yet: it sets `pending_load_`, and `OnSongListReceived()` loads once the reply lands. Previously it indexed past `buffer_count_` and did nothing, leaving `Playing` with `playing_ == false` permanently — bites as soon as the library exceeds 5 songs | — |
 
 ---
 

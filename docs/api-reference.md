@@ -462,6 +462,7 @@ everything else is private, including `PickNextExpression()`,
 | `kWordDisplayTimeoutMs` | 5000 | Blank the screen after a word has been shown this long |
 | `kHandshakeTimeoutMs` | 10000 | Wait for `AUDIO_STARTED` |
 | `kSongRequestTimeoutMs` | 5000 | Wait for a BLE response |
+| `kLoadFailedTimeoutMs` | 1500 | Leave a failure screen and return to the song list |
 | `kWindowSize` | 5 | Song-list rows kept in the scroll buffer |
 | `kSongNameLen` | 32 | Bytes per buffered song name |
 
@@ -471,7 +472,9 @@ everything else is private, including `PickNextExpression()`,
 - `song_buffer_[5][32]` — the visible scroll window
 - `visible_lines_[5]` — `const char*` row pointers passed to the display
   (member storage, required by the pointer-lifetime rule)
-- `selected_index_`, `buffer_offset_`, `buffer_count_`, `total_songs_`
+- `selected_index_`, `buffer_offset_`, `requested_offset_`, `buffer_count_`,
+  `total_songs_` — `requested_offset_` holds the offset of the in-flight
+  `REQUEST_SONGS` and is copied into `buffer_offset_` when the reply arrives
 
 Private state machine, request helpers, transitions, playback control, display
 helpers, and the parser are described in

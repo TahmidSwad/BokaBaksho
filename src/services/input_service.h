@@ -26,8 +26,10 @@ private:
   void PostInput(InputType type);
 
   // Navigation buttons:
-  //   Increment  -> RotateRight
-  //   Decrement  -> RotateLeft
+  //   Increment  -> InputType::ButtonIncrement
+  //   Decrement  -> InputType::ButtonDecrement
+  //   (RotateLeft/RotateRight come only from PollSerialDebug()'s 'l'/'r'
+  //    keys — Poll() never emits them.)
   Button increment_button;
   Button decrement_button;
 

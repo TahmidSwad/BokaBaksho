@@ -74,11 +74,24 @@ void LyricsApp::OnSongListReceived(const char* names) {
     if (*p == '|') p++;
   }
   buffer_count_ = added;
+  // Captured before it is cleared. The song-list timeout is the only
+  // transition into LoadFailed guarded by waiting_for_songs_, so this flag
+  // still set here means the error screen is one we can now supersede.
+  const bool songs_were_pending = waiting_for_songs_;
   waiting_for_songs_ = false;
+  // The buffer now holds exactly the window that was asked for, so the offset
+  // has to move with it. Committed here rather than in RequestSongs() so that
+  // a timed-out request never claims an offset its stale buffer does not have.
+  buffer_offset_ = requested_offset_;
 
-  if (added < kWindowSize) {
+  if (added > 0 && total_songs_ == 0) {
+    // No TOTAL_SONGS| has been seen. Fall back to the lower bound this window
+    // proves, instead of leaving 0: total_songs_ - 1 would underflow to 255
+    // while scrolling, and auto-advance would compute a modulo by zero.
+    total_songs_ = buffer_offset_ + added;
+  } else if (added < kWindowSize) {
     uint8_t actual_total = buffer_offset_ + added;
-    if (total_songs_ == 0 || actual_total < total_songs_) {
+    if (actual_total < total_songs_) {
       total_songs_ = actual_total;
     }
   }
@@ -87,10 +100,32 @@ void LyricsApp::OnSongListReceived(const char* names) {
   Serial.print(added);
   Serial.println(" songs");
 
-  if (state_ == State::WaitingSongs && added > 0) {
-    EnterFileList();
-  } else if (state_ == State::FileList) {
-    ShowFileList();
+  if (pending_load_ && state_ == State::Playing) {
+    // Auto-advance asked for a window containing the next song; load it now
+    // that the window has actually moved.
+    pending_load_ = false;
+    LoadSelectedLyric();
+    if (state_ == State::Playing) {
+      // LoadSelectedLyric() bailed without changing state: the reply still
+      // does not contain the target. Fall back rather than sitting in Playing
+      // with playback_ stopped and nothing on screen.
+      Serial.println("BLE: window still misses the target song");
+      ReturnToFileList();
+    }
+  } else {
+    pending_load_ = false;  // the request was abandoned before its reply
+    if (state_ == State::WaitingSongs && added > 0) {
+      EnterFileList();
+    } else if (state_ == State::FileList) {
+      ShowFileList();
+    } else if (state_ == State::LoadFailed && songs_were_pending && added > 0) {
+      // The reply outlived its own 5 s timeout. The screen is saying
+      // "No device" about a device that has just spoken, and holding it for
+      // the rest of kLoadFailedTimeoutMs would throw away a round trip we
+      // already paid for — so show the list now instead.
+      Serial.println("BLE: late SONGS reply clears LoadFailed");
+      EnterFileList();
+    }
   }
 }
 
@@ -213,6 +248,10 @@ void LyricsApp::RequestSongs(uint8_t offset) {
     Serial.print("BLE TX: ");
     Serial.println(cmd);
     waiting_for_songs_ = true;
+    // Remember which window this reply will describe. buffer_offset_ is NOT
+    // updated here — only when the reply actually arrives — so a timeout
+    // leaves the previous buffer paired with the previous offset.
+    requested_offset_ = offset;
     song_request_start_ = millis();
   } else {
     Serial.println("BLE: not connected");
@@ -258,12 +297,18 @@ void LyricsApp::LoadSelectedLyric() {
 
 void LyricsApp::EnterWaitingSongs() {
   state_ = State::WaitingSongs;
+  pending_load_ = false;
   buffer_offset_ = 0;
+  requested_offset_ = 0;
   buffer_count_ = 0;
   total_songs_ = 0;
   selected_index_ = 0;
   waiting_for_songs_ = true;
   waiting_for_lyrics_ = false;
+  // A fresh wait must not inherit the previous request's deadline. Otherwise
+  // re-entering WaitingSongs while disconnected trips the song-list timeout
+  // on the very next Update() and bounces straight back to LoadFailed.
+  song_request_start_ = 0;
   ShowStatus("Connect to PC", TextSize::Medium);
   if (ble_service.IsConnected()) {
     RequestSongs(0);
@@ -272,6 +317,7 @@ void LyricsApp::EnterWaitingSongs() {
 
 void LyricsApp::EnterFileList() {
   state_ = State::FileList;
+  pending_load_ = false;
   loaded_ = false;
   playing_ = false;
   paused_ = false;
@@ -563,6 +609,16 @@ void LyricsApp::Update() {
       break;
     }
     case State::LoadFailed:
+      // load_failed_start_ is stamped at every transition into this state but
+      // was never read, so an error screen stayed until BACK: Enter() and the
+      // navigation buttons are swallowed here (HandleInput returns true), so
+      // BACK was the only exit.
+      if (load_failed_start_ > 0 &&
+          millis() - load_failed_start_ >= kLoadFailedTimeoutMs) {
+        Serial.println("LoadFailed: auto-return");
+        load_failed_start_ = 0;
+        ReturnToFileList();
+      }
       break;
     case State::Playing: {
       if (!ble_service.IsConnected()) {
@@ -573,10 +629,25 @@ void LyricsApp::Update() {
       if (playback_ended_) {
         playback_ended_ = false;
         StopPlayback();
+        if (total_songs_ == 0) {
+          // Library size unknown: % 0 is undefined behaviour, and with no
+          // total there is no next index to compute. Fall back to the list,
+          // which re-requests the library and recomputes the total.
+          Serial.println("END: total_songs_ unknown, not advancing");
+          ReturnToFileList();
+          break;
+        }
         uint8_t next = (selected_index_ + 1) % total_songs_;
         selected_index_ = next;
         if (next < buffer_offset_ || next >= buffer_offset_ + buffer_count_) {
+          // The target is outside the current window. Loading now would index
+          // past buffer_count_ and return without doing anything, leaving
+          // state Playing with playing_ false — stuck forever, since the
+          // SONGS reply does not trigger a load either. Request the window and
+          // let OnSongListReceived() load once the reply lands.
           RequestSongs(next < kWindowSize / 2 ? 0 : next - kWindowSize / 2);
+          pending_load_ = true;
+          break;
         }
         LoadSelectedLyric();
         break;

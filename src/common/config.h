@@ -14,8 +14,10 @@ namespace config {
 // ==========================================================
 namespace pins {
   // Navigation buttons:
-  //   Increment button -> RotateRight
-  //   Decrement button -> RotateLeft
+  //   Increment button -> InputType::ButtonIncrement
+  //   Decrement button -> InputType::ButtonDecrement
+  //   (RotateLeft/RotateRight are serial debug keys only — see
+  //    InputService::PollSerialDebug() — and are never posted by a pin.)
   constexpr uint8_t ButtonIncrement = 26;
   constexpr uint8_t ButtonDecrement = 25;
 
